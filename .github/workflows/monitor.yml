@@ -11,7 +11,7 @@ scan:
 runs-on: ubuntu-latest
 timeout-minutes: 4   # Kill if takes longer than 4 mins
 
-```
+
 steps:
   - name: Checkout code
     uses: actions/checkout@v4
