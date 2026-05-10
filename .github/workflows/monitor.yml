@@ -1,6 +1,6 @@
 name: FXAlexG Forex Monitor
 
-
+on:
   workflow_dispatch:
 
 env:
@@ -10,18 +10,24 @@ jobs:
   scan:
     runs-on: ubuntu-latest
     timeout-minutes: 4
+
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: actions/setup-python@v5.6.0
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5.6.0
         with:
           python-version: '3.12'
-      - run: pip install requests
-      - name: Run Monitor
-        env:
-          OANDA_API_KEY: ${{ secrets.OANDA_API_KEY }}
-          OANDA_ACCOUNT_ID: ${{ secrets.OANDA_ACCOUNT_ID }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python fxalexg_monitor.py
 
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run FXAlexG Monitor
+        env:
+          OANDA_API_KEY:      ${{ secrets.OANDA_API_KEY }}
+          OANDA_ACCOUNT_ID:   ${{ secrets.OANDA_ACCOUNT_ID }}
+          GEMINI_API_KEY:     ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python fxalexg_monitor.py
