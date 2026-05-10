@@ -1,8 +1,6 @@
 name: FXAlexG Forex Monitor
 
-on:
-  schedule:
-    - cron: '*/30 * * * *'
+
   workflow_dispatch:
 
 env:
