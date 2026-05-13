@@ -111,31 +111,109 @@ def fetch_candles(pair, granularity, count=120):
 # ─────────────────────────────────────────────
 # SWING POINT DETECTOR
 # ─────────────────────────────────────────────
+def body_high(candle):
+    return max(candle['open'], candle['close'])
+
+def body_low(candle):
+    return min(candle['open'], candle['close'])
+
 def swing_points(candles, lookback=5):
+    # Body prices only — FXAlexG rule (no wicks)
     highs, lows = [], []
     for i in range(lookback, len(candles) - lookback):
         window = candles[i - lookback: i + lookback + 1]
-        if candles[i]['high'] == max(c['high'] for c in window):
-            highs.append({'i': i, 'price': candles[i]['high']})
-        if candles[i]['low'] == min(c['low'] for c in window):
-            lows.append({'i': i, 'price': candles[i]['low']})
+        if body_high(candles[i]) == max(body_high(c) for c in window):
+            highs.append({'i': i, 'price': body_high(candles[i])})
+        if body_low(candles[i]) == min(body_low(c) for c in window):
+            lows.append({'i': i, 'price': body_low(candles[i])})
     return highs, lows
 
+def snake_trick_hl(bar_i, lows):
+    # Snake goes back from new HH — first turning point = Higher Low
+    lows_before = sorted(
+        [l for l in lows if l['i'] < bar_i],
+        key=lambda x: x['i'], reverse=True
+    )
+    return lows_before[0] if lows_before else None
+
+def snake_trick_lh(bar_i, highs):
+    # Snake goes back from new LL — first turning point = Lower High
+    highs_before = sorted(
+        [h for h in highs if h['i'] < bar_i],
+        key=lambda x: x['i'], reverse=True
+    )
+    return highs_before[0] if highs_before else None
+
 # ─────────────────────────────────────────────
-# MARKET STRUCTURE
+# MARKET STRUCTURE — FXAlexG Snake Trick
+# State machine: tracks HH/HL and LH/LL
+# Body close confirmation required to shift state
+# Snake trick used to place HL and LH correctly
 # ─────────────────────────────────────────────
-def trend(highs, lows):
+def trend(highs, lows, candles=None):
     if len(highs) < 2 or len(lows) < 2:
         return 'NEUTRAL'
-    h  = sorted(highs[-2:], key=lambda x: x['i'])
-    l  = sorted(lows[-2:],  key=lambda x: x['i'])
-    hh = h[1]['price'] > h[0]['price']
-    hl = l[1]['price'] > l[0]['price']
-    lh = h[1]['price'] < h[0]['price']
-    ll = l[1]['price'] < l[0]['price']
-    if hh and hl: return 'BULLISH'
-    if lh and ll: return 'BEARISH'
-    return 'NEUTRAL'
+    if candles is None or len(candles) < 10:
+        return 'NEUTRAL'
+
+    # Merge and sort all swing points chronologically
+    all_pts = sorted(
+        [('H', h['i'], h['price']) for h in highs] +
+        [('L', l['i'], l['price']) for l in lows],
+        key=lambda x: x[1]
+    )
+
+    state      = 'NEUTRAL'
+    current_hh = None
+    current_hl = None
+    current_ll = None
+    current_lh = None
+
+    for (ptype, bar_i, price) in all_pts:
+
+        if state == 'NEUTRAL':
+            if ptype == 'H':
+                current_hh = {'i': bar_i, 'price': price}
+                current_hl = snake_trick_hl(bar_i, lows)
+                state = 'BULLISH'
+            else:
+                current_ll = {'i': bar_i, 'price': price}
+                current_lh = snake_trick_lh(bar_i, highs)
+                state = 'BEARISH'
+
+        elif state == 'BULLISH':
+            if ptype == 'H' and price > current_hh['price']:
+                # New Higher High confirmed — update HH and find new HL
+                current_hh = {'i': bar_i, 'price': price}
+                new_hl = snake_trick_hl(bar_i, lows)
+                if new_hl:
+                    current_hl = new_hl
+            elif ptype == 'L':
+                if current_hl and price < current_hl['price']:
+                    # Body closed BELOW Higher Low — shift BEARISH
+                    current_ll = {'i': bar_i, 'price': price}
+                    current_lh = snake_trick_lh(bar_i, highs)
+                    state      = 'BEARISH'
+                    current_hh = None
+                    current_hl = None
+
+        elif state == 'BEARISH':
+            if ptype == 'L' and price < current_ll['price']:
+                # New Lower Low confirmed — update LL and find new LH
+                current_ll = {'i': bar_i, 'price': price}
+                new_lh = snake_trick_lh(bar_i, highs)
+                if new_lh:
+                    current_lh = new_lh
+            elif ptype == 'H':
+                if current_lh and price > current_lh['price']:
+                    # Body closed ABOVE Lower High — shift BULLISH
+                    current_hh = {'i': bar_i, 'price': price}
+                    current_hl = snake_trick_hl(bar_i, lows)
+                    state      = 'BULLISH'
+                    current_ll = None
+                    current_lh = None
+
+    return state
 
 # ─────────────────────────────────────────────
 # 50 EMA
@@ -235,11 +313,110 @@ def detect_hs(candles, highs, lows):
     return complete_ones[0] if complete_ones else (results[-1] if results else None)
 
 # ─────────────────────────────────────────────
+# CANDLESTICK ENTRY SIGNAL DETECTOR
+# FXAlexG rule: need engulfing to enter
+# Primary:   Engulfing (bearish/bullish)
+# Secondary: Pin Bar
+# Tertiary:  Evening Star / Morning Star
+# Other:     Marubozu
+# All use BODY closes only - no wicks
+# ─────────────────────────────────────────────
+def detect_entry_signal(candles, direction):
+    if len(candles) < 3:
+        return None
+
+    c1   = candles[-3]
+    prev = candles[-2]
+    curr = candles[-1]
+
+    prev_body_high = max(prev['open'], prev['close'])
+    prev_body_low  = min(prev['open'], prev['close'])
+    curr_body_high = max(curr['open'], curr['close'])
+    curr_body_low  = min(curr['open'], curr['close'])
+    prev_body_size = abs(prev['close'] - prev['open'])
+    curr_body_size = abs(curr['close'] - curr['open'])
+    prev_is_bull   = prev['close'] > prev['open']
+    prev_is_bear   = prev['close'] < prev['open']
+    curr_is_bull   = curr['close'] > curr['open']
+    curr_is_bear   = curr['close'] < curr['open']
+    total_range    = curr['high'] - curr['low']
+
+    # 1. ENGULFING — Primary signal Alex always looks for
+    if direction == 'SELL':
+        if (prev_is_bull and curr_is_bear and
+                curr_body_high >= prev_body_high and
+                curr_body_low <= prev_body_low and
+                curr_body_size > prev_body_size * 0.8):
+            return {'pattern': 'BEARISH ENGULFING', 'strength': 'STRONG',
+                    'direction': 'SELL', 'entry': round(curr['close'], 5)}
+
+    if direction == 'BUY':
+        if (prev_is_bear and curr_is_bull and
+                curr_body_high >= prev_body_high and
+                curr_body_low <= prev_body_low and
+                curr_body_size > prev_body_size * 0.8):
+            return {'pattern': 'BULLISH ENGULFING', 'strength': 'STRONG',
+                    'direction': 'BUY', 'entry': round(curr['close'], 5)}
+
+    # 2. PIN BAR
+    if total_range > 0:
+        upper_wick = curr['high'] - curr_body_high
+        lower_wick = curr_body_low - curr['low']
+
+        if (direction == 'SELL' and
+                upper_wick >= curr_body_size * 2 and
+                upper_wick >= total_range * 0.6 and
+                curr_body_size <= total_range * 0.35):
+            return {'pattern': 'BEARISH PIN BAR', 'strength': 'MODERATE',
+                    'direction': 'SELL', 'entry': round(curr['close'], 5)}
+
+        if (direction == 'BUY' and
+                lower_wick >= curr_body_size * 2 and
+                lower_wick >= total_range * 0.6 and
+                curr_body_size <= total_range * 0.35):
+            return {'pattern': 'BULLISH PIN BAR', 'strength': 'MODERATE',
+                    'direction': 'BUY', 'entry': round(curr['close'], 5)}
+
+    # 3. EVENING STAR / MORNING STAR
+    c1_body_size = abs(c1['close'] - c1['open'])
+    c2_body_size = abs(prev['close'] - prev['open'])
+    c3_body_size = curr_body_size
+
+    if direction == 'SELL':
+        if (c1['close'] > c1['open'] and
+                c2_body_size < c1_body_size * 0.3 and
+                curr_is_bear and
+                curr['close'] <= (c1['open'] + c1['close']) / 2 and
+                c3_body_size >= c1_body_size * 0.5):
+            return {'pattern': 'EVENING STAR', 'strength': 'STRONG',
+                    'direction': 'SELL', 'entry': round(curr['close'], 5)}
+
+    if direction == 'BUY':
+        if (c1['close'] < c1['open'] and
+                c2_body_size < c1_body_size * 0.3 and
+                curr_is_bull and
+                curr['close'] >= (c1['open'] + c1['close']) / 2 and
+                c3_body_size >= c1_body_size * 0.5):
+            return {'pattern': 'MORNING STAR', 'strength': 'STRONG',
+                    'direction': 'BUY', 'entry': round(curr['close'], 5)}
+
+    # 4. MARUBOZU
+    if total_range > 0 and curr_body_size / total_range >= 0.85:
+        if direction == 'SELL' and curr_is_bear:
+            return {'pattern': 'BEARISH MARUBOZU', 'strength': 'STRONG',
+                    'direction': 'SELL', 'entry': round(curr['close'], 5)}
+        if direction == 'BUY' and curr_is_bull:
+            return {'pattern': 'BULLISH MARUBOZU', 'strength': 'STRONG',
+                    'direction': 'BUY', 'entry': round(curr['close'], 5)}
+
+    return None
+
+# ─────────────────────────────────────────────
 # CONFLUENCE SCORER (FXAlexG)
 # ─────────────────────────────────────────────
-def score(trends, aoi_zone, hs, ema_sig):
+def score(trends, aoi_zone, hs, ema_sig, entry_signal=None):
     pts, reasons = 0, []
-    aligned = [tf for tf, t in trends.items() if t != 'NEUTRAL']
+    aligned = [tf for tf, t in trends.items() if t != "NEUTRAL"]
     pts += len(aligned)
     if len(aligned) == 4:
         reasons.append("All 4 TFs aligned")
@@ -251,18 +428,24 @@ def score(trends, aoi_zone, hs, ema_sig):
         reasons.append("TFs not aligned")
     if aoi_zone:
         pts += 2
-        reasons.append("At AOI " + str(aoi_zone['size_pips']) + "p wide, " + str(aoi_zone['touches']) + " touches")
+        reasons.append("At AOI " + str(aoi_zone["size_pips"]) + "p wide, " + str(aoi_zone["touches"]) + " touches")
     else:
         reasons.append("Not at AOI")
     if hs:
-        pts += 3 if hs['complete'] else 2
-        tag = "COMPLETE" if hs['complete'] else "forming"
-        reasons.append(hs['type'] + " (" + hs['direction'] + ") " + tag)
+        pts += 3 if hs["complete"] else 2
+        tag = "COMPLETE" if hs["complete"] else "forming"
+        reasons.append(hs["type"] + " (" + hs["direction"] + ") " + tag)
     if ema_sig:
         pts += 1
-        side = "above" if ema_sig == 'ABOVE' else "below"
+        side = "above" if ema_sig == "ABOVE" else "below"
         reasons.append("H1 price " + side + " 50 EMA")
-    grade = 'A+' if pts >= 8 else 'B+' if pts >= 6 else 'C+' if pts >= 4 else 'D+'
+    if entry_signal:
+        strength_pts = 2 if entry_signal["strength"] == "STRONG" else 1
+        pts += strength_pts
+        reasons.append(entry_signal["pattern"] + " on H1 (" + entry_signal["strength"] + ")")
+    else:
+        reasons.append("No entry signal yet")
+    grade = "A+" if pts >= 9 else "B+" if pts >= 7 else "C+" if pts >= 5 else "D+"
     return grade, pts, reasons
 
 # ─────────────────────────────────────────────
@@ -396,6 +579,12 @@ def ask_gemini_fxalexg(pair, data):
         str(data['hs']['neckline']) + " " + ("COMPLETE" if data['hs']['complete'] else "Forming")
         if data['hs'] else "Not detected"
     )
+    es = data.get('entry_signal')
+    es_txt = (
+        es['pattern'] + ' (' + es['strength'] + ') Entry at ' + str(es['entry'])
+        if es else 'None detected yet — wait for candle confirmation'
+    )
+
     prompt = (
         "You are an expert forex analyst using the FXAlexG Set and Forget strategy.\n"
         "Analyse this setup and give a clear mobile-friendly trade recommendation.\n\n"
@@ -407,10 +596,11 @@ def ask_gemini_fxalexg(pair, data):
         "  Daily  : " + data['trends'].get('D', 'N/A') + "\n"
         "  4H     : " + data['trends'].get('H4', 'N/A') + "\n"
         "  1H     : " + data['trends'].get('H1', 'N/A') + "\n\n"
-        "AOI ZONE    : " + aoi_txt + "\n"
-        "50 EMA (H1) : " + str(data['ema']) + " Price is " + str(data['ema_sig']) + "\n"
-        "H&S PATTERN : " + hs_txt + "\n\n"
-        "GRADE: " + data['grade'] + " Score: " + str(data['pts']) + "/10\n"
+        "AOI ZONE      : " + aoi_txt + "\n"
+        "50 EMA (H1)   : " + str(data['ema']) + " Price is " + str(data['ema_sig']) + "\n"
+        "H&S PATTERN   : " + hs_txt + "\n"
+        "ENTRY SIGNAL  : " + es_txt + "\n\n"
+        "GRADE: " + data['grade'] + " Score: " + str(data['pts']) + "/12\n"
         "CONFLUENCES: " + ", ".join(data['reasons']) + "\n\n"
         "Reply with EXACTLY this format:\n"
         "DIRECTION: [BUY / SELL / WAIT]\n"
@@ -495,18 +685,19 @@ def mark_ict_alerted():
 # ─────────────────────────────────────────────
 def analyse_fxalexg(pair):
     print("  [FXAlexG] " + pair)
-    trends   = {}
-    all_aois = []
-    best_hs  = None
-    h1_ema   = None
-    ema_sig  = None
+    trends    = {}
+    all_aois  = []
+    best_hs   = None
+    h1_ema    = None
+    ema_sig   = None
+    h1_candles = []
 
     for tf in TIMEFRAMES:
         candles = fetch_candles(pair, tf)
         if len(candles) < 20:
             continue
         h, l = swing_points(candles)
-        trends[tf] = trend(h, l)
+        trends[tf] = trend(h, l, candles)
         if tf in ('D', 'W'):
             all_aois.extend(detect_aois(candles, pair))
         if tf in ('H4', 'H1'):
@@ -519,6 +710,7 @@ def analyse_fxalexg(pair):
             if h1_ema:
                 last_close = candles[-1]['close']
                 ema_sig = 'ABOVE' if last_close > h1_ema else 'BELOW'
+            h1_candles = candles
 
     if not trends:
         return
@@ -528,8 +720,18 @@ def analyse_fxalexg(pair):
         return
     price = latest[-1]['close']
 
+    # Determine trade direction from majority trend
+    bullish_count = sum(1 for t in trends.values() if t == 'BULLISH')
+    bearish_count = sum(1 for t in trends.values() if t == 'BEARISH')
+    direction = 'BUY' if bullish_count > bearish_count else 'SELL' if bearish_count > bullish_count else None
+
+    # Detect entry signal on H1 candles
+    entry_signal = None
+    if direction and h1_candles and len(h1_candles) >= 3:
+        entry_signal = detect_entry_signal(h1_candles, direction)
+
     aoi_zone        = at_aoi(price, all_aois, pair)
-    grade, pts, reasons = score(trends, aoi_zone, best_hs, ema_sig)
+    grade, pts, reasons = score(trends, aoi_zone, best_hs, ema_sig, entry_signal)
     print("     Grade: " + grade + " | Score: " + str(pts) + " | Trends: " + str(trends))
 
     if grade not in MIN_GRADE_TO_ALERT:
@@ -539,15 +741,16 @@ def analyse_fxalexg(pair):
         return
 
     data = {
-        'price':   price,
-        'trends':  trends,
-        'aoi':     aoi_zone,
-        'ema':     round(h1_ema, 5) if h1_ema else 'N/A',
-        'ema_sig': ema_sig or 'N/A',
-        'hs':      best_hs,
-        'grade':   grade,
-        'pts':     pts,
-        'reasons': reasons,
+        'price':        price,
+        'trends':       trends,
+        'aoi':          aoi_zone,
+        'ema':          round(h1_ema, 5) if h1_ema else 'N/A',
+        'ema_sig':      ema_sig or 'N/A',
+        'hs':           best_hs,
+        'entry_signal': entry_signal,
+        'grade':        grade,
+        'pts':          pts,
+        'reasons':      reasons,
     }
 
     analysis = ask_gemini_fxalexg(pair, data)
@@ -563,12 +766,19 @@ def analyse_fxalexg(pair):
     for r in reasons:
         reasons_txt += "  " + r + "\n"
 
+    es = data.get('entry_signal')
+    es_line = (
+        "Entry Signal: " + es['pattern'] + " @ " + str(es['entry']) + "\n"
+        if es else "Entry Signal: Waiting for confirmation\n"
+    )
+
     msg = (
         emojis[emoji] + " <b>FXAlexG Alert</b>\n"
-        "<b>" + pair.replace('_', '/') + "  [" + grade + "]  Score: " + str(pts) + "/10</b>\n\n"
+        "<b>" + pair.replace('_', '/') + "  [" + grade + "]  Score: " + str(pts) + "/12</b>\n\n"
         "Price: <code>" + str(price) + "</code>\n"
-        "Time: " + datetime.now(timezone.utc).strftime('%H:%M UTC') + "\n\n"
-        "<b>Confluences:</b>\n" + reasons_txt + "\n"
+        "Time: " + datetime.now(timezone.utc).strftime('%H:%M UTC') + "\n"
+        + es_line +
+        "\n<b>Confluences:</b>\n" + reasons_txt + "\n"
         "<b>Analysis:</b>\n" + analysis
     )
     send_telegram(msg)
@@ -602,7 +812,7 @@ def analyse_ict_gold():
     # Get daily candles for bias
     d_candles = fetch_candles('XAU_USD', 'D', count=10)
     h_d, l_d  = swing_points(d_candles) if d_candles else ([], [])
-    daily_bias = trend(h_d, l_d)
+    daily_bias = trend(h_d, l_d, d_candles)
 
     # Asian range
     asian = get_asian_range(m15_candles)
