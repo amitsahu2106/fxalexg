@@ -23,6 +23,19 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
+      - name: Restore trades cache
+        uses: actions/cache@v4
+        with:
+          path: trades.json
+          key: trades-cache
+          restore-keys: trades-cache
+
+      - name: Create trades file if missing
+        run: |
+          if [ ! -f trades.json ]; then
+            echo '{}' > trades.json
+          fi
+
       - name: Run FXAlexG Monitor
         env:
           OANDA_API_KEY:      ${{ secrets.OANDA_API_KEY }}
@@ -31,3 +44,9 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python fxalexg_monitor.py
+
+      - name: Save trades cache
+        uses: actions/cache@v4
+        with:
+          path: trades.json
+          key: trades-cache
