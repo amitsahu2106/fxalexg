@@ -1,24 +1,26 @@
 """
-FXAlexG + ICT Killzone Monitor (Upgraded)
+FXAlexG + ICT Killzone Monitor
 ================================
 Strategy 1 - FXAlexG Set & Forget (all 9 pairs)
   - Top-down analysis W/D/4H/1H
-  - ATR-based Stop Loss (1.5x ATR)
-  - Strict 2:1 Risk-to-Reward Floor for TP1
-  - Auto-Breakeven at TP1
-  - Weighted 10-Point Scoring Hierarchy
+  - AOIs max 60 pips, min 3 touches
+  - 50 EMA filter
+  - Head & Shoulders pattern
+  - Grades A+/B+/C+/D+
 
 Strategy 2 - ICT Killzone (XAU/USD only)
   - Asian session range detection
-  - London & NY killzones
-  - Liquidity sweep & FVG detection
+  - London killzone (08:00-11:00 UTC)
+  - New York killzone (13:00-16:00 UTC)
+  - Liquidity sweep detection
+  - Fair Value Gap detection
+  - Alerts only inside killzones
 """
 
 import requests
 import time
 import os
-from datetime import datetime, timezone, timedelta
-import json
+from datetime import datetime, timezone
 
 # ─────────────────────────────────────────────
 # CONFIGURATION
@@ -37,9 +39,6 @@ GEMINI_URL         = (
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "")
 
-# NEW: Free API key from Finnhub.io for Economic Calendar
-FINNHUB_API_KEY    = os.environ.get("FINNHUB_API_KEY", "") 
-
 # ─────────────────────────────────────────────
 # STRATEGY 1 - FXALEXG SETTINGS
 # ─────────────────────────────────────────────
@@ -50,25 +49,24 @@ PAIRS = [
 TIMEFRAMES         = ['W', 'D', 'H4', 'H1', 'M15']
 EMA_PERIOD         = 50
 MAX_AOI_PIPS       = 60
-STRONG_AOI_PIPS    = 45
-STRONG_AOI_TOUCHES = 5
 MIN_AOI_TOUCHES    = 3
 MIN_GRADE_TO_ALERT = ['A+', 'B+']
 
 # ─────────────────────────────────────────────
 # STRATEGY 2 - ICT KILLZONE SETTINGS (XAU/USD)
 # ─────────────────────────────────────────────
-ASIAN_START_UTC    = 0
-ASIAN_END_UTC      = 8
-LONDON_START_UTC   = 8
-LONDON_END_UTC     = 11
-NY_START_UTC       = 13
-NY_END_UTC         = 16
-SWEEP_BUFFER_GOLD  = 0.50
-FVG_MIN_SIZE_GOLD  = 0.30
+ASIAN_START_UTC    = 0    # 00:00 UTC
+ASIAN_END_UTC      = 8    # 08:00 UTC
+LONDON_START_UTC   = 8    # 08:00 UTC
+LONDON_END_UTC     = 11   # 11:00 UTC
+NY_START_UTC       = 13   # 13:00 UTC
+NY_END_UTC         = 16   # 16:00 UTC
+SWEEP_BUFFER_GOLD  = 0.50 # $0.50 buffer for sweep detection
+FVG_MIN_SIZE_GOLD  = 0.30 # Minimum $0.30 FVG size
+ICT_COOLDOWN_MIN   = 120  # 2 hour cooldown for ICT alerts
 
 # ─────────────────────────────────────────────
-# PIP HELPERS & ATR
+# PIP HELPERS
 # ─────────────────────────────────────────────
 def pip_size(pair):
     if 'JPY' in pair: return 0.01
@@ -82,17 +80,6 @@ def to_pips(price_diff, pair):
 def from_pips(pips, pair):
     return pips * pip_size(pair)
 
-def get_atr(candles, period=14):
-    """Calculates the Average True Range for volatility-based SL."""
-    if len(candles) < period + 1: return 0.0020
-    ranges = []
-    for i in range(1, len(candles)):
-        h_l = candles[i]['high'] - candles[i]['low']
-        h_pc = abs(candles[i]['high'] - candles[i-1]['close'])
-        l_pc = abs(candles[i]['low'] - candles[i-1]['close'])
-        ranges.append(max(h_l, h_pc, l_pc))
-    return sum(ranges[-period:]) / period
-
 # ─────────────────────────────────────────────
 # OANDA DATA FETCHER
 # ─────────────────────────────────────────────
@@ -103,6 +90,7 @@ def fetch_candles(pair, granularity, count=120):
     try:
         r = requests.get(url, headers=headers, params=params, timeout=10)
         if r.status_code != 200:
+            print("  OANDA error " + str(r.status_code) + " for " + pair + "/" + granularity)
             return []
         candles = []
         for c in r.json().get('candles', []):
@@ -115,16 +103,21 @@ def fetch_candles(pair, granularity, count=120):
                     'close': float(c['mid']['c']),
                 })
         return candles
-    except:
+    except Exception as e:
+        print("  Fetch error " + pair + "/" + granularity + ": " + str(e))
         return []
 
 # ─────────────────────────────────────────────
 # SWING POINT DETECTOR
 # ─────────────────────────────────────────────
-def body_high(candle): return max(candle['open'], candle['close'])
-def body_low(candle): return min(candle['open'], candle['close'])
+def body_high(candle):
+    return max(candle['open'], candle['close'])
+
+def body_low(candle):
+    return min(candle['open'], candle['close'])
 
 def swing_points(candles, lookback=5):
+    # Body prices only - FXAlexG rule (no wicks)
     highs, lows = [], []
     for i in range(lookback, len(candles) - lookback):
         window = candles[i - lookback: i + lookback + 1]
@@ -135,341 +128,1202 @@ def swing_points(candles, lookback=5):
     return highs, lows
 
 def snake_trick_hl(bar_i, lows):
-    lows_before = sorted([l for l in lows if l['i'] < bar_i], key=lambda x: x['i'], reverse=True)
+    # Snake goes back from new HH - first turning point = Higher Low
+    lows_before = sorted(
+        [l for l in lows if l['i'] < bar_i],
+        key=lambda x: x['i'], reverse=True
+    )
     return lows_before[0] if lows_before else None
 
 def snake_trick_lh(bar_i, highs):
-    highs_before = sorted([h for h in highs if h['i'] < bar_i], key=lambda x: x['i'], reverse=True)
+    # Snake goes back from new LL - first turning point = Lower High
+    highs_before = sorted(
+        [h for h in highs if h['i'] < bar_i],
+        key=lambda x: x['i'], reverse=True
+    )
     return highs_before[0] if highs_before else None
 
 # ─────────────────────────────────────────────
-# MARKET STRUCTURE
+# MARKET STRUCTURE - FXAlexG Snake Trick
+# State machine: tracks HH/HL and LH/LL
+# Body close confirmation required to shift state
+# Snake trick used to place HL and LH correctly
 # ─────────────────────────────────────────────
 def trend(highs, lows, candles=None):
-    if len(highs) < 2 or len(lows) < 2: return 'NEUTRAL'
-    if candles is None or len(candles) < 10: return 'NEUTRAL'
+    if len(highs) < 2 or len(lows) < 2:
+        return 'NEUTRAL'
+    if candles is None or len(candles) < 10:
+        return 'NEUTRAL'
 
-    all_pts = sorted([('H', h['i'], h['price']) for h in highs] + [('L', l['i'], l['price']) for l in lows], key=lambda x: x[1])
-    state, current_hh, current_hl, current_ll, current_lh = 'NEUTRAL', None, None, None, None
+    # Merge and sort all swing points chronologically
+    all_pts = sorted(
+        [('H', h['i'], h['price']) for h in highs] +
+        [('L', l['i'], l['price']) for l in lows],
+        key=lambda x: x[1]
+    )
+
+    state      = 'NEUTRAL'
+    current_hh = None
+    current_hl = None
+    current_ll = None
+    current_lh = None
 
     for (ptype, bar_i, price) in all_pts:
+
         if state == 'NEUTRAL':
             if ptype == 'H':
-                current_hh, current_hl, state = {'i': bar_i, 'price': price}, snake_trick_hl(bar_i, lows), 'BULLISH'
+                current_hh = {'i': bar_i, 'price': price}
+                current_hl = snake_trick_hl(bar_i, lows)
+                state = 'BULLISH'
             else:
-                current_ll, current_lh, state = {'i': bar_i, 'price': price}, snake_trick_lh(bar_i, highs), 'BEARISH'
+                current_ll = {'i': bar_i, 'price': price}
+                current_lh = snake_trick_lh(bar_i, highs)
+                state = 'BEARISH'
+
         elif state == 'BULLISH':
             if ptype == 'H' and price > current_hh['price']:
+                # New Higher High confirmed - update HH and find new HL
                 current_hh = {'i': bar_i, 'price': price}
                 new_hl = snake_trick_hl(bar_i, lows)
-                if new_hl: current_hl = new_hl
+                if new_hl:
+                    current_hl = new_hl
             elif ptype == 'L':
                 if current_hl and price < current_hl['price']:
-                    current_ll, current_lh, state, current_hh, current_hl = {'i': bar_i, 'price': price}, snake_trick_lh(bar_i, highs), 'BEARISH', None, None
+                    # Body closed BELOW Higher Low - shift BEARISH
+                    current_ll = {'i': bar_i, 'price': price}
+                    current_lh = snake_trick_lh(bar_i, highs)
+                    state      = 'BEARISH'
+                    current_hh = None
+                    current_hl = None
+
         elif state == 'BEARISH':
             if ptype == 'L' and price < current_ll['price']:
+                # New Lower Low confirmed - update LL and find new LH
                 current_ll = {'i': bar_i, 'price': price}
                 new_lh = snake_trick_lh(bar_i, highs)
-                if new_lh: current_lh = new_lh
+                if new_lh:
+                    current_lh = new_lh
             elif ptype == 'H':
                 if current_lh and price > current_lh['price']:
-                    current_hh, current_hl, state, current_ll, current_lh = {'i': bar_i, 'price': price}, snake_trick_hl(bar_i, lows), 'BULLISH', None, None
+                    # Body closed ABOVE Lower High - shift BULLISH
+                    current_hh = {'i': bar_i, 'price': price}
+                    current_hl = snake_trick_hl(bar_i, lows)
+                    state      = 'BULLISH'
+                    current_ll = None
+                    current_lh = None
+
     return state
 
 # ─────────────────────────────────────────────
-# 50 EMA & AOI DETECTOR
+# 50 EMA
 # ─────────────────────────────────────────────
 def ema50(candles):
     closes = [c['close'] for c in candles]
-    if len(closes) < EMA_PERIOD: return None
-    m, val = 2 / (EMA_PERIOD + 1), sum(closes[:EMA_PERIOD]) / EMA_PERIOD
-    for p in closes[EMA_PERIOD:]: val = (p - val) * m + val
+    if len(closes) < EMA_PERIOD:
+        return None
+    m   = 2 / (EMA_PERIOD + 1)
+    val = sum(closes[:EMA_PERIOD]) / EMA_PERIOD
+    for p in closes[EMA_PERIOD:]:
+        val = (p - val) * m + val
     return val
 
-def detect_aois(candles, pair):
-    highs, lows = swing_points(candles, lookback=3)
-    max_zone = from_pips(MAX_AOI_PIPS, pair)
-    strong_zone = from_pips(STRONG_AOI_PIPS, pair)
-    levels = sorted([p['price'] for p in highs + lows])
-    zones, i = [], 0
+# ─────────────────────────────────────────────
+# AOI DETECTOR (FXAlexG)
+# ─────────────────────────────────────────────
+def count_reversals(candles, zone_top, zone_bot, pair):
+    # Count times price ENTERED zone and reversed direction
+    buf          = from_pips(3, pair)
+    reversals    = 0
+    inside       = False
+    entered_from = None
+    for c in candles:
+        bh      = body_high(c)
+        bl      = body_low(c)
+        price   = c['close']
+        in_zone = bl <= zone_top + buf and bh >= zone_bot - buf
+        if in_zone and not inside:
+            inside       = True
+            entered_from = 'above' if c['open'] > (zone_top + zone_bot) / 2 else 'below'
+        elif not in_zone and inside:
+            inside = False
+            if entered_from == 'above' and price < zone_bot:
+                reversals += 1
+            elif entered_from == 'below' and price > zone_top:
+                reversals += 1
+    return reversals
 
+def detect_aois(candles, pair):
+    # Two-tier AOI system:
+    # STRONG AOI: >= 5 touches, >= 4 reversals, <= 45 pips → 3.0 pts
+    # GOOD AOI:   >= 3 touches, >= 3 reversals, <= 60 pips → 1.0 pts
+    highs, lows = swing_points(candles, lookback=3)
+    max_zone    = from_pips(60, pair)  # Max 60 pips for good AOI
+    levels      = sorted([p['price'] for p in highs + lows])
+    zones, i    = [], 0
     while i < len(levels):
-        base, j = levels[i], i + 1
-        while j < len(levels) and levels[j] - base <= max_zone: j += 1
+        base = levels[i]
+        j    = i + 1
+        while j < len(levels) and levels[j] - base <= max_zone:
+            j += 1
         cluster = levels[i:j]
-        if len(cluster) >= MIN_AOI_TOUCHES:
-            top, bot = max(cluster), min(cluster)
+        if len(cluster) >= 3:  # Minimum 3 touches
+            top     = max(cluster)
+            bot     = min(cluster)
             sz_pips = to_pips(top - bot, pair)
-            if sz_pips <= MAX_AOI_PIPS:
-                blow_throughs = sum(1 for c in candles if body_low(c) < bot and body_high(c) > top)
-                is_strong = (len(cluster) >= STRONG_AOI_TOUCHES and sz_pips <= STRONG_AOI_PIPS and blow_throughs == 0)
+            if sz_pips <= 60:
+                rev = count_reversals(candles, top, bot, pair)
+                # Classify AOI tier
+                if len(cluster) >= 5 and rev >= 4 and sz_pips <= 45:
+                    tier = 'STRONG'
+                    pts  = 2.5
+                elif len(cluster) >= 3 and rev >= 3 and sz_pips <= 60:
+                    tier = 'GOOD'
+                    pts  = 1.5
+                else:
+                    i = j
+                    continue  # Does not qualify as either tier
                 zones.append({
-                    'top': top, 'bottom': bot, 'mid': (top + bot) / 2, 'touches': len(cluster),
-                    'size_pips': round(sz_pips, 1), 'strength': 'STRONG' if is_strong else 'NORMAL',
+                    'top':       top,
+                    'bottom':    bot,
+                    'mid':       (top + bot) / 2,
+                    'touches':   len(cluster),
+                    'reversals': rev,
+                    'tier':      tier,
+                    'aoi_pts':   pts,
+                    'size_pips': round(sz_pips, 1),
                 })
         i = j
+    # Sort strongest first
+    zones.sort(key=lambda z: z['aoi_pts'], reverse=True)
     return zones
 
 def at_aoi(price, zones, pair):
     buf = from_pips(5, pair)
-    candidates = [z for z in zones if (z['bottom'] - buf) <= price <= (z['top'] + buf)]
-    if not candidates: return None
-    strong = [z for z in candidates if z['strength'] == 'STRONG']
-    return max(strong if strong else candidates, key=lambda z: z['touches'])
+    for z in zones:
+        if (z['bottom'] - buf) <= price <= (z['top'] + buf):
+            return z
+    return None
 
 # ─────────────────────────────────────────────
-# HEAD & SHOULDERS & ENTRY SIGNALS
+# HEAD & SHOULDERS DETECTOR (FXAlexG)
 # ─────────────────────────────────────────────
 def detect_hs(candles, highs, lows):
     results = []
     sh = sorted(highs, key=lambda x: x['i'])
     for i in range(len(sh) - 2):
         ls, hd, rs = sh[i], sh[i+1], sh[i+2]
-        if hd['price'] <= ls['price'] or hd['price'] <= rs['price']: continue
-        if abs(ls['price'] - rs['price']) > (hd['price'] - min(ls['price'], rs['price'])) * 0.5: continue
-        neckline = (min([c['low'] for c in candles[ls['i']:hd['i']]] or [0]) + min([c['low'] for c in candles[hd['i']:rs['i']]] or [0])) / 2
-        results.append({'type': 'HEAD & SHOULDERS', 'direction': 'BEARISH', 'neckline': round(neckline, 5), 'complete': candles[-1]['close'] < neckline})
-    
+        if hd['price'] <= ls['price'] or hd['price'] <= rs['price']:
+            continue
+        diff = abs(ls['price'] - rs['price'])
+        h    = hd['price'] - min(ls['price'], rs['price'])
+        if diff > h * 0.5:
+            continue
+        seg1     = [c['low'] for c in candles[ls['i']:hd['i']]] or [0]
+        seg2     = [c['low'] for c in candles[hd['i']:rs['i']]] or [0]
+        neckline = (min(seg1) + min(seg2)) / 2
+        complete = candles[-1]['close'] < neckline
+        results.append({
+            'type': 'HEAD & SHOULDERS', 'direction': 'BEARISH',
+            'left_shoulder': round(ls['price'], 5),
+            'head': round(hd['price'], 5),
+            'right_shoulder': round(rs['price'], 5),
+            'neckline': round(neckline, 5), 'complete': complete,
+        })
     sl = sorted(lows, key=lambda x: x['i'])
     for i in range(len(sl) - 2):
         ls, hd, rs = sl[i], sl[i+1], sl[i+2]
-        if hd['price'] >= ls['price'] or hd['price'] >= rs['price']: continue
-        if abs(ls['price'] - rs['price']) > (max(ls['price'], rs['price']) - hd['price']) * 0.5: continue
-        neckline = (max([c['high'] for c in candles[ls['i']:hd['i']]] or [0]) + max([c['high'] for c in candles[hd['i']:rs['i']]] or [0])) / 2
-        results.append({'type': 'INVERSE H&S', 'direction': 'BULLISH', 'neckline': round(neckline, 5), 'complete': candles[-1]['close'] > neckline})
-    
-    complete = [p for p in results if p['complete']]
-    return complete[0] if complete else (results[-1] if results else None)
+        if hd['price'] >= ls['price'] or hd['price'] >= rs['price']:
+            continue
+        diff     = abs(ls['price'] - rs['price'])
+        d        = max(ls['price'], rs['price']) - hd['price']
+        if diff > d * 0.5:
+            continue
+        seg1     = [c['high'] for c in candles[ls['i']:hd['i']]] or [0]
+        seg2     = [c['high'] for c in candles[hd['i']:rs['i']]] or [0]
+        neckline = (max(seg1) + max(seg2)) / 2
+        complete = candles[-1]['close'] > neckline
+        results.append({
+            'type': 'INVERSE H&S', 'direction': 'BULLISH',
+            'left_shoulder': round(ls['price'], 5),
+            'head': round(hd['price'], 5),
+            'right_shoulder': round(rs['price'], 5),
+            'neckline': round(neckline, 5), 'complete': complete,
+        })
+    complete_ones = [p for p in results if p['complete']]
+    return complete_ones[0] if complete_ones else (results[-1] if results else None)
 
+# ─────────────────────────────────────────────
+# CANDLESTICK ENTRY SIGNAL DETECTOR
+# FXAlexG rule: need engulfing to enter
+# Primary:   Engulfing (bearish/bullish)
+# Secondary: Pin Bar
+# Tertiary:  Evening Star / Morning Star
+# Other:     Marubozu
+# All use BODY closes only - no wicks
+# ─────────────────────────────────────────────
 def detect_entry_signal(candles, direction):
-    if len(candles) < 3: return None
-    c1, prev, curr = candles[-3], candles[-2], candles[-1]
-    curr_bh, curr_bl = max(curr['open'], curr['close']), min(curr['open'], curr['close'])
-    prev_bh, prev_bl = max(prev['open'], prev['close']), min(prev['open'], prev['close'])
-    curr_sz, prev_sz = abs(curr['close'] - curr['open']), abs(prev['close'] - prev['open'])
-    
-    if direction == 'SELL' and prev['close'] > prev['open'] and curr['close'] < curr['open']:
-        if curr_bh >= prev_bh and curr_bl <= prev_bl and curr_sz > prev_sz * 0.8:
-            return {'pattern': 'BEARISH ENGULFING', 'strength': 'STRONG', 'entry': round(curr['close'], 5)}
-    elif direction == 'BUY' and prev['close'] < prev['open'] and curr['close'] > curr['open']:
-        if curr_bh >= prev_bh and curr_bl <= prev_bl and curr_sz > prev_sz * 0.8:
-            return {'pattern': 'BULLISH ENGULFING', 'strength': 'STRONG', 'entry': round(curr['close'], 5)}
-    
-    tr = curr['high'] - curr['low']
-    if tr > 0:
-        if direction == 'SELL' and (curr['high'] - curr_bh) >= curr_sz * 2 and (curr['high'] - curr_bh) >= tr * 0.6:
-            return {'pattern': 'BEARISH PIN BAR', 'strength': 'MODERATE', 'entry': round(curr['close'], 5)}
-        if direction == 'BUY' and (curr_bl - curr['low']) >= curr_sz * 2 and (curr_bl - curr['low']) >= tr * 0.6:
-            return {'pattern': 'BULLISH PIN BAR', 'strength': 'MODERATE', 'entry': round(curr['close'], 5)}
+    if len(candles) < 3:
+        return None
+
+    c1   = candles[-3]
+    prev = candles[-2]
+    curr = candles[-1]
+
+    prev_body_high = max(prev['open'], prev['close'])
+    prev_body_low  = min(prev['open'], prev['close'])
+    curr_body_high = max(curr['open'], curr['close'])
+    curr_body_low  = min(curr['open'], curr['close'])
+    prev_body_size = abs(prev['close'] - prev['open'])
+    curr_body_size = abs(curr['close'] - curr['open'])
+    prev_is_bull   = prev['close'] > prev['open']
+    prev_is_bear   = prev['close'] < prev['open']
+    curr_is_bull   = curr['close'] > curr['open']
+    curr_is_bear   = curr['close'] < curr['open']
+    total_range    = curr['high'] - curr['low']
+
+    # 1. ENGULFING - Primary signal Alex always looks for
+    if direction == 'SELL':
+        if (prev_is_bull and curr_is_bear and
+                curr_body_high >= prev_body_high and
+                curr_body_low <= prev_body_low and
+                curr_body_size > prev_body_size * 0.8):
+            return {'pattern': 'BEARISH ENGULFING', 'strength': 'STRONG',
+                    'direction': 'SELL', 'entry': round(curr['close'], 5)}
+
+    if direction == 'BUY':
+        if (prev_is_bear and curr_is_bull and
+                curr_body_high >= prev_body_high and
+                curr_body_low <= prev_body_low and
+                curr_body_size > prev_body_size * 0.8):
+            return {'pattern': 'BULLISH ENGULFING', 'strength': 'STRONG',
+                    'direction': 'BUY', 'entry': round(curr['close'], 5)}
+
+    # 2. PIN BAR
+    if total_range > 0:
+        upper_wick = curr['high'] - curr_body_high
+        lower_wick = curr_body_low - curr['low']
+
+        if (direction == 'SELL' and
+                upper_wick >= curr_body_size * 2 and
+                upper_wick >= total_range * 0.6 and
+                curr_body_size <= total_range * 0.35):
+            return {'pattern': 'BEARISH PIN BAR', 'strength': 'MODERATE',
+                    'direction': 'SELL', 'entry': round(curr['close'], 5)}
+
+        if (direction == 'BUY' and
+                lower_wick >= curr_body_size * 2 and
+                lower_wick >= total_range * 0.6 and
+                curr_body_size <= total_range * 0.35):
+            return {'pattern': 'BULLISH PIN BAR', 'strength': 'MODERATE',
+                    'direction': 'BUY', 'entry': round(curr['close'], 5)}
+
+    # 3. EVENING STAR / MORNING STAR
+    c1_body_size = abs(c1['close'] - c1['open'])
+    c2_body_size = abs(prev['close'] - prev['open'])
+    c3_body_size = curr_body_size
+
+    if direction == 'SELL':
+        if (c1['close'] > c1['open'] and
+                c2_body_size < c1_body_size * 0.3 and
+                curr_is_bear and
+                curr['close'] <= (c1['open'] + c1['close']) / 2 and
+                c3_body_size >= c1_body_size * 0.5):
+            return {'pattern': 'EVENING STAR', 'strength': 'STRONG',
+                    'direction': 'SELL', 'entry': round(curr['close'], 5)}
+
+    if direction == 'BUY':
+        if (c1['close'] < c1['open'] and
+                c2_body_size < c1_body_size * 0.3 and
+                curr_is_bull and
+                curr['close'] >= (c1['open'] + c1['close']) / 2 and
+                c3_body_size >= c1_body_size * 0.5):
+            return {'pattern': 'MORNING STAR', 'strength': 'STRONG',
+                    'direction': 'BUY', 'entry': round(curr['close'], 5)}
+
+    # 4. MARUBOZU
+    if total_range > 0 and curr_body_size / total_range >= 0.85:
+        if direction == 'SELL' and curr_is_bear:
+            return {'pattern': 'BEARISH MARUBOZU', 'strength': 'STRONG',
+                    'direction': 'SELL', 'entry': round(curr['close'], 5)}
+        if direction == 'BUY' and curr_is_bull:
+            return {'pattern': 'BULLISH MARUBOZU', 'strength': 'STRONG',
+                    'direction': 'BUY', 'entry': round(curr['close'], 5)}
+
     return None
 
 # ─────────────────────────────────────────────
-# NEW WEIGHTED SCORING SYSTEM
+# CONFLUENCE SCORER (FXAlexG)
 # ─────────────────────────────────────────────
-def score(trends, direction, aoi_zone, hs, ema_sig, entry_signal=None):
-    pts = 0.0
+def score(trends, aoi_zone, hs, ema_sig, entry_signal=None, entry_tf=None):
+    # ─── POINT SYSTEM ─────────────────────────────
+    # Weekly Trend:    1.5
+    # Daily Trend:     1.5
+    # H4 Trend:        1.0
+    # H1 Trend:        1.0
+    # Strong AOI:      3.0  (5+ touches, 4+ reversals, <=45 pips)
+    # Good AOI:        1.0  (3+ touches, 3+ reversals, <=60 pips)
+    # 50 EMA:          1.0
+    # Head & Shoulders:0.5
+    # H1 Entry Signal: 0.5
+    # MAX TOTAL:       10.0
+    # A+ >= 8.0   B+ >= 7.0
+    # ──────────────────────────────────────────────
+    pts     = 0.0
     reasons = []
 
-    # 1. Foundation (Max 3.0)
-    if trends.get('W') == direction:
-        pts += 1.5; reasons.append("Weekly Trend: Aligned (1.5)")
-    if trends.get('D') == direction:
-        pts += 1.5; reasons.append("Daily Trend: Aligned (1.5)")
+    # Individual TF points
+    tf_pts = {'W': 1.5, 'D': 1.5, 'H4': 1.0, 'H1': 1.0}
+    tf_names = {'W': 'Weekly', 'D': 'Daily', 'H4': '4H', 'H1': '1H'}
 
-    # 2. Structure (Max 3.0)
-    if aoi_zone:
-        if aoi_zone.get('strength') == 'STRONG':
-            pts += 3.0; reasons.append("Strong AOI Hit (3.0)")
+    bullish_tfs = 0
+    bearish_tfs = 0
+
+    for tf in ['W', 'D', 'H4', 'H1']:
+        t = trends.get(tf, 'NEUTRAL')
+        direction_majority = 'BULLISH' if sum(1 for x in trends.values() if x == 'BULLISH') > sum(1 for x in trends.values() if x == 'BEARISH') else 'BEARISH'
+        if t == 'BULLISH':
+            bullish_tfs += 1
+            pts += tf_pts[tf]
+            reasons.append(tf_names[tf] + ': BULLISH (+' + str(tf_pts[tf]) + ')')
+        elif t == 'BEARISH':
+            bearish_tfs += 1
+            pts += tf_pts[tf]
+            reasons.append(tf_names[tf] + ': BEARISH (+' + str(tf_pts[tf]) + ')')
         else:
-            pts += 1.5; reasons.append("Normal AOI Hit (1.5)")
+            reasons.append(tf_names[tf] + ': NEUTRAL')
 
-    # 3. Confirmation (Max 2.0)
-    if trends.get('H4') == direction:
-        pts += 1.0; reasons.append("H4 Trend: Aligned (1.0)")
-    if trends.get('H1') == direction:
-        pts += 1.0; reasons.append("H1 Trend: Aligned (1.0)")
+    majority_tfs = max(bullish_tfs, bearish_tfs)
 
-    # 4. Patterns (Max 1.0)
-    if ema_sig == ('ABOVE' if direction == 'BUY' else 'BELOW'):
-        pts += 0.5; reasons.append("H1 50 EMA: Aligned (0.5)")
-    if hs and hs['direction'] == direction:
-        pts += 0.5; reasons.append("H&S Pattern: Present (0.5)")
+    # AOI points
+    if aoi_zone:
+        aoi_pts = aoi_zone.get('aoi_pts', 1.0)
+        tier    = aoi_zone.get('tier', 'GOOD')
+        pts    += aoi_pts
+        reasons.append(
+            tier + ' AOI ' + str(aoi_zone['size_pips']) + 'p, ' +
+            str(aoi_zone['touches']) + ' touches, ' +
+            str(aoi_zone.get('reversals', 0)) + ' reversals (+' + str(aoi_pts) + ')'
+        )
+    else:
+        reasons.append('Not at AOI')
 
-    # 5. Trigger (Max 1.0)
-    if entry_signal:
-        pts += 1.0; reasons.append(f"Signal: {entry_signal['pattern']} (1.0)")
+    # EMA
+    if ema_sig:
+        pts += 1.0
+        side = 'above' if ema_sig == 'ABOVE' else 'below'
+        reasons.append('H1 price ' + side + ' 50 EMA (+1.0)')
 
-    grade = 'A+' if pts >= 9.0 else 'B+' if pts >= 8.0 else 'C+' if pts >= 5.0 else 'D+'
+    # H&S
+    if hs and hs['complete']:
+        pts += 1.0
+        reasons.append(hs['type'] + ' (' + hs['direction'] + ') COMPLETE (+1.0)')
+    elif hs:
+        reasons.append(hs['type'] + ' (' + hs['direction'] + ') forming')
+
+    # Entry signal
+    if entry_signal and entry_tf:
+        pts += 0.5
+        reasons.append(entry_signal['pattern'] + ' on ' + entry_tf + ' (' + entry_signal['strength'] + ') (+0.5)')
+    else:
+        reasons.append('No entry signal yet')
+
+    # Cap at 10
+    pts = round(min(pts, 10.0), 1)
+
+    # Grade
+    if majority_tfs < 3:
+        grade = 'D+'
+    else:
+        grade = 'A+' if pts >= 8.0 else 'B+' if pts >= 7.0 else 'C+' if pts >= 5.0 else 'D+'
+
     return grade, pts, reasons
 
 # ─────────────────────────────────────────────
-# IMPROVED SL / TP CALCULATOR (ATR & 2:1 RR)
+# ICT - ASIAN SESSION RANGE
 # ─────────────────────────────────────────────
-def calc_sl_tp(direction, price, aoi_zone, pair, all_aois, h1_candles):
-    atr = get_atr(h1_candles)
-    buffer = atr * 1.5 
+def get_asian_range(m15_candles):
+    asian_candles = []
+    for c in m15_candles:
+        try:
+            hour = int(c['time'][11:13])
+            if ASIAN_START_UTC <= hour < ASIAN_END_UTC:
+                asian_candles.append(c)
+        except:
+            continue
+    if len(asian_candles) < 4:
+        return None
+    return {
+        'high': max(c['high'] for c in asian_candles),
+        'low':  min(c['low']  for c in asian_candles),
+        'candles': len(asian_candles),
+    }
 
-    if direction == 'SELL' and aoi_zone:
-        sl = round(aoi_zone['top'] + buffer, 5)
-        risk = abs(sl - price)
-        tp1_min = price - (risk * 2.0) # Strict 2:1 Floor
-        
-        lower_aois = sorted([z for z in all_aois if z['top'] < aoi_zone['bottom']], key=lambda z: z['touches'], reverse=True)
-        tp1 = round(min(tp1_min, lower_aois[0]['mid'] if lower_aois else tp1_min), 5)
-        tp2 = round(tp1 - risk, 5) # 3:1 Total
-        
-    elif direction == 'BUY' and aoi_zone:
-        sl = round(aoi_zone['bottom'] - buffer, 5)
-        risk = abs(price - sl)
-        tp1_min = price + (risk * 2.0) # Strict 2:1 Floor
-        
-        higher_aois = sorted([z for z in all_aois if z['bottom'] > aoi_zone['top']], key=lambda z: z['touches'], reverse=True)
-        tp1 = round(max(tp1_min, higher_aois[0]['mid'] if higher_aois else tp1_min), 5)
-        tp2 = round(tp1 + risk, 5)
-    else:
-        # Fallback if no AOI
-        sl = round(price + (buffer if direction == 'SELL' else -buffer), 5)
-        risk = abs(price - sl)
-        tp1 = round(price + (risk * 2.0 * (-1 if direction == 'SELL' else 1)), 5)
-        tp2 = round(price + (risk * 3.0 * (-1 if direction == 'SELL' else 1)), 5)
+# ─────────────────────────────────────────────
+# ICT - KILLZONE CHECK
+# ─────────────────────────────────────────────
+def in_killzone(now_utc):
+    h = now_utc.hour
+    if LONDON_START_UTC <= h < LONDON_END_UTC:
+        return 'LONDON'
+    if NY_START_UTC <= h < NY_END_UTC:
+        return 'NEW YORK'
+    return None
 
-    return sl, tp1, tp2
+# ─────────────────────────────────────────────
+# ICT - LIQUIDITY SWEEP DETECTOR
+# ─────────────────────────────────────────────
+def detect_sweep(m15_candles, asian_range):
+    if not asian_range or len(m15_candles) < 3:
+        return None
+    asian_high = asian_range['high']
+    asian_low  = asian_range['low']
+    recent     = m15_candles[-6:]
+
+    for i in range(1, len(recent) - 1):
+        prev  = recent[i - 1]
+        curr  = recent[i]
+        nxt   = recent[i + 1]
+
+        # Bearish sweep - spike above Asian high then close back below
+        if (curr['high'] > asian_high + SWEEP_BUFFER_GOLD and
+                curr['close'] < asian_high and
+                nxt['close'] < curr['close']):
+            return {
+                'type':      'BEARISH SWEEP',
+                'direction': 'SELL',
+                'swept':     round(curr['high'], 2),
+                'level':     round(asian_high, 2),
+                'entry':     round(curr['close'], 2),
+            }
+
+        # Bullish sweep - spike below Asian low then close back above
+        if (curr['low'] < asian_low - SWEEP_BUFFER_GOLD and
+                curr['close'] > asian_low and
+                nxt['close'] > curr['close']):
+            return {
+                'type':      'BULLISH SWEEP',
+                'direction': 'BUY',
+                'swept':     round(curr['low'], 2),
+                'level':     round(asian_low, 2),
+                'entry':     round(curr['close'], 2),
+            }
+    return None
+
+# ─────────────────────────────────────────────
+# ICT - FAIR VALUE GAP DETECTOR
+# ─────────────────────────────────────────────
+def detect_fvg(m15_candles):
+    if len(m15_candles) < 3:
+        return None
+    fvgs = []
+    for i in range(1, len(m15_candles) - 1):
+        c1 = m15_candles[i - 1]
+        c3 = m15_candles[i + 1]
+
+        # Bullish FVG - gap between c1 high and c3 low
+        if c3['low'] > c1['high'] and (c3['low'] - c1['high']) >= FVG_MIN_SIZE_GOLD:
+            fvgs.append({
+                'type':      'BULLISH FVG',
+                'direction': 'BUY',
+                'top':       round(c3['low'], 2),
+                'bottom':    round(c1['high'], 2),
+                'size':      round(c3['low'] - c1['high'], 2),
+            })
+
+        # Bearish FVG - gap between c1 low and c3 high
+        if c1['low'] > c3['high'] and (c1['low'] - c3['high']) >= FVG_MIN_SIZE_GOLD:
+            fvgs.append({
+                'type':      'BEARISH FVG',
+                'direction': 'SELL',
+                'top':       round(c1['low'], 2),
+                'bottom':    round(c3['high'], 2),
+                'size':      round(c1['low'] - c3['high'], 2),
+            })
+    return fvgs[-1] if fvgs else None
+
+# ─────────────────────────────────────────────
+# GEMINI AI CALL
+# ─────────────────────────────────────────────
+def ask_gemini(prompt):
+    try:
+        r = requests.post(
+            GEMINI_URL + "?key=" + GEMINI_API_KEY,
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+            timeout=30,
+        )
+        if r.status_code == 200:
+            return r.json()['candidates'][0]['content']['parts'][0]['text']
+        print("  Gemini error " + str(r.status_code) + ": " + r.text[:200])
+    except Exception as e:
+        print("  Gemini failed: " + str(e))
+    return None
+
+def ask_gemini_fxalexg(pair, data):
+    aoi_txt = (
+        "YES " + str(data['aoi']['bottom']) + " to " + str(data['aoi']['top']) +
+        " (" + str(data['aoi']['size_pips']) + " pips, " + str(data['aoi']['touches']) + " touches)"
+        if data['aoi'] else "No"
+    )
+    hs_txt = (
+        data['hs']['type'] + " (" + data['hs']['direction'] + ") Neckline:" +
+        str(data['hs']['neckline']) + " " + ("COMPLETE" if data['hs']['complete'] else "Forming")
+        if data['hs'] else "Not detected"
+    )
+    es    = data.get('entry_signal')
+    es_tf = data.get('entry_tf', '')
+    es_txt = (
+        es['pattern'] + ' on ' + es_tf + ' (' + es['strength'] + ') Entry at ' + str(es['entry'])
+        if es else 'None detected yet - wait for candle confirmation'
+    )
+
+    prompt = (
+        "You are an expert forex analyst using the FXAlexG Set and Forget strategy.\n"
+        "Analyse this setup and give a clear mobile-friendly trade recommendation.\n\n"
+        "PAIR: " + pair.replace('_', '/') + "\n"
+        "PRICE: " + str(data['price']) + "\n"
+        "TIME: " + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC') + "\n\n"
+        "TREND (top-down):\n"
+        "  Weekly : " + data['trends'].get('W', 'N/A') + "\n"
+        "  Daily  : " + data['trends'].get('D', 'N/A') + "\n"
+        "  4H     : " + data['trends'].get('H4', 'N/A') + "\n"
+        "  1H     : " + data['trends'].get('H1', 'N/A') + "\n\n"
+        "AOI ZONE      : " + aoi_txt + "\n"
+        "50 EMA (H1)   : " + str(data['ema']) + " Price is " + str(data['ema_sig']) + "\n"
+        "H&S PATTERN   : " + hs_txt + "\n"
+        "ENTRY SIGNAL  : " + es_txt + "\n\n"
+        "GRADE: " + data['grade'] + " Score: " + str(data['pts']) + "/10\n"
+        "CONFLUENCES: " + ", ".join(data['reasons']) + "\n\n"
+        "Reply with EXACTLY this format:\n"
+        "DIRECTION: " + str(data.get("direction", "N/A")) + "\n"
+        "ENTRY: " + str(data["price"]) + "\n"
+        "STOP LOSS: " + str(data["sl"]) + " (above/below AOI)\n"
+        "TAKE PROFIT 1: " + str(data["tp1"]) + " (next AOI)\n"
+        "TAKE PROFIT 2: " + str(data["tp2"]) + " (next AOI far edge)\n"
+        "ANALYSIS: [2-3 sentences validating the SL and TP levels]\n"
+        "RISK NOTE: [one sentence]"
+    )
+    return ask_gemini(prompt)
+
+def ask_gemini_ict(data):
+    prompt = (
+        "You are an expert gold trader using ICT (Inner Circle Trader) concepts.\n"
+        "Analyse this XAU/USD killzone setup and give a trade recommendation.\n\n"
+        "PAIR: XAU/USD (Gold)\n"
+        "PRICE: " + str(data['price']) + "\n"
+        "TIME: " + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC') + "\n"
+        "KILLZONE: " + data['killzone'] + "\n\n"
+        "ASIAN SESSION RANGE:\n"
+        "  High: " + str(data['asian']['high']) + "\n"
+        "  Low : " + str(data['asian']['low']) + "\n"
+        "  Range: " + str(round(data['asian']['high'] - data['asian']['low'], 2)) + " points\n\n"
+        "LIQUIDITY SWEEP: " + (
+            data['sweep']['type'] + " at " + str(data['sweep']['swept']) +
+            " (Asian level: " + str(data['sweep']['level']) + ")"
+            if data['sweep'] else "Not detected"
+        ) + "\n"
+        "FAIR VALUE GAP: " + (
+            data['fvg']['type'] + " " + str(data['fvg']['bottom']) +
+            " to " + str(data['fvg']['top']) + " (size: " + str(data['fvg']['size']) + ")"
+            if data['fvg'] else "Not detected"
+        ) + "\n"
+        "DAILY BIAS: " + data['daily_bias'] + "\n\n"
+        "Reply with EXACTLY this format:\n"
+        "DIRECTION: [BUY / SELL / WAIT]\n"
+        "ENTRY: [price or zone]\n"
+        "STOP LOSS: [price]\n"
+        "TAKE PROFIT 1: [price 2R]\n"
+        "TAKE PROFIT 2: [price 3R]\n"
+        "ANALYSIS: [2-3 sentences about why this is valid ICT setup]\n"
+        "RISK NOTE: [one sentence]"
+    )
+    return ask_gemini(prompt)
 
 # ─────────────────────────────────────────────
 # TELEGRAM SENDER
 # ─────────────────────────────────────────────
 def send_telegram(msg):
     try:
-        requests.post(
-            f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage",
+        r = requests.post(
+            "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/sendMessage",
             json={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"},
             timeout=10,
         )
-    except: pass
-
-# ─────────────────────────────────────────────
-# NEWS ALERTS
-# ─────────────────────────────────────────────
-def check_news_alerts():
-    if not FINNHUB_API_KEY:
-        print("  [News] Skipping: FINNHUB_API_KEY not set.")
-        return
-
-    try:
-        today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
-        url = f"https://finnhub.io/api/v1/calendar/economic?from={today}&to={today}&token={FINNHUB_API_KEY}"
-        r = requests.get(url, timeout=10)
-        
-        if r.status_code == 200:
-            events = r.json().get('economicCalendar', [])
-            now_utc = datetime.now(timezone.utc)
-            
-            for event in events:
-                if event.get('impact') == 'high':
-                    event_time = datetime.strptime(event['time'], '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
-                    time_diff = event_time - now_utc
-                    
-                    # Alert if news is between 115 and 125 mins away
-                    if timedelta(minutes=115) <= time_diff <= timedelta(minutes=125):
-                        msg = (f"⚠️ <b>HIGH IMPACT NEWS WARNING</b>\n"
-                               f"Event: {event.get('event')}\n"
-                               f"Currency: {event.get('country')}\n"
-                               f"Time: In 2 Hours")
-                        send_telegram(msg)
-                        print(f"  [News] Alert sent for {event.get('currency')}")
+        if r.status_code != 200:
+            print("  Telegram error " + str(r.status_code))
     except Exception as e:
-        print(f"  [News] Error fetching calendar: {e}")
+        print("  Telegram failed: " + str(e))
 
 # ─────────────────────────────────────────────
-# TRADE TRACKER (WITH AUTO-BREAKEVEN)
+# TRADE TRACKER
+# Stores active trades in trades.json on disk
+# Tracks P&L, alerts on TP/SL hit
 # ─────────────────────────────────────────────
+import json
+
 TRADES_FILE = 'trades.json'
 
 def load_trades():
     try:
-        with open(TRADES_FILE, 'r') as f: return json.load(f)
-    except: return {}
+        with open(TRADES_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return {}
 
 def save_trades(trades):
-    with open(TRADES_FILE, 'w') as f: json.dump(trades, f, indent=2)
+    try:
+        with open(TRADES_FILE, 'w') as f:
+            json.dump(trades, f, indent=2)
+    except Exception as e:
+        print('  Error saving trades: ' + str(e))
 
-def add_trade(pair, direction, entry, sl, tp1, tp2):
+def add_trade(pair, direction, entry, sl, tp1, tp2, aoi_zone):
     trades = load_trades()
-    if any(t.get('pair') == pair for t in trades.values()): return False
-    trade_id = f"{pair}_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}"
-    trades[trade_id] = {'pair': pair, 'direction': direction, 'entry': entry, 'sl': sl, 'tp1': tp1, 'tp2': tp2, 'tp1_hit': False}
+    # 1 trade per pair - skip if pair already being tracked
+    if pair in trades:
+        print('  Trade already tracked for ' + pair + ' - skipping')
+        return
+    trades[pair] = {
+        'pair':      pair,
+        'direction': direction,
+        'entry':     entry,
+        'sl':        sl,
+        'tp1':       tp1,
+        'tp2':       tp2,
+        'tp1_hit':   False,
+        'aoi_top':   aoi_zone['top']    if aoi_zone else None,
+        'aoi_bottom':aoi_zone['bottom'] if aoi_zone else None,
+        'opened_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
+    }
     save_trades(trades)
-    return True
+    print('  Trade added to tracker: ' + pair)
 
-def remove_trade(trade_id):
+def remove_trade(pair):
     trades = load_trades()
-    if trade_id in trades: del trades[trade_id]; save_trades(trades)
+    if pair in trades:
+        del trades[pair]
+        save_trades(trades)
+
+def calc_pips(price_diff, pair):
+    return round(price_diff / pip_size(pair), 1)
+
+def calc_atr(candles, period=14):
+    # Average True Range over last `period` candles
+    if len(candles) < period + 1:
+        return None
+    trs = []
+    for i in range(1, len(candles)):
+        high  = candles[i]['high']
+        low   = candles[i]['low']
+        prev_close = candles[i-1]['close']
+        tr = max(high - low, abs(high - prev_close), abs(low - prev_close))
+        trs.append(tr)
+    return sum(trs[-period:]) / period
+
+def calc_sl_tp(direction, price, aoi_zone, pair, all_aois, candles=None):
+    # BUY:
+    #   SL  = lower edge of current AOI - (1.5 * ATR)
+    #   TP1 = entry + (risk * 2) minimum, must land inside an AOI above
+    #   TP2 = lower edge of the NEXT AOI above TP1
+    # SELL:
+    #   SL  = upper edge of current AOI + (1.5 * ATR)
+    #   TP1 = entry - (risk * 2) minimum, must land inside an AOI below
+    #   TP2 = upper edge of the NEXT AOI below TP1
+    atr = calc_atr(candles) if candles else None
+    atr_buf = atr * 1.5 if atr else from_pips(10, pair)
+
+    if direction == 'BUY' and aoi_zone:
+        sl   = round(aoi_zone['bottom'] - atr_buf, 5)
+        risk = abs(price - sl)
+        min_tp1 = price + risk * 2.0  # Minimum 2R
+
+        # Find AOIs above current price sorted by proximity
+        higher_aois = sorted(
+            [z for z in all_aois if z['bottom'] > aoi_zone['top']],
+            key=lambda z: z['bottom']
+        )
+
+        tp1 = None
+        tp2 = None
+        for idx, z in enumerate(higher_aois):
+            # TP1 must be inside this AOI AND at least 2R away
+            if z['bottom'] >= min_tp1 or z['top'] >= min_tp1:
+                # Entry + 2R lands inside or above this AOI bottom
+                tp1 = round(max(min_tp1, z['bottom']), 5)
+                # TP2 = bottom of NEXT AOI above TP1 zone
+                if idx + 1 < len(higher_aois):
+                    tp2 = round(higher_aois[idx + 1]['bottom'], 5)
+                else:
+                    tp2 = round(z['top'] + from_pips(5, pair), 5)
+                break
+
+        if tp1 is None:
+            tp1 = round(price + risk * 2.0, 5)
+            tp2 = round(price + risk * 3.0, 5)
+
+    elif direction == 'SELL' and aoi_zone:
+        sl   = round(aoi_zone['top'] + atr_buf, 5)
+        risk = abs(sl - price)
+        min_tp1 = price - risk * 2.0  # Minimum 2R
+
+        # Find AOIs below current price sorted by proximity (nearest first)
+        lower_aois = sorted(
+            [z for z in all_aois if z['top'] < aoi_zone['bottom']],
+            key=lambda z: z['top'], reverse=True
+        )
+
+        tp1 = None
+        tp2 = None
+        for idx, z in enumerate(lower_aois):
+            # TP1 must be inside this AOI AND at least 2R below
+            if z['top'] <= min_tp1 or z['bottom'] <= min_tp1:
+                tp1 = round(min(min_tp1, z['top']), 5)
+                # TP2 = top of NEXT AOI below TP1 zone
+                if idx + 1 < len(lower_aois):
+                    tp2 = round(lower_aois[idx + 1]['top'], 5)
+                else:
+                    tp2 = round(z['bottom'] - from_pips(5, pair), 5)
+                break
+
+        if tp1 is None:
+            tp1 = round(price - risk * 2.0, 5)
+            tp2 = round(price - risk * 3.0, 5)
+
+    else:
+        atr_buf = atr * 1.5 if atr else from_pips(15, pair)
+        if direction == 'SELL':
+            sl  = round(price + atr_buf, 5)
+            risk = abs(sl - price)
+            tp1 = round(price - risk * 2.0, 5)
+            tp2 = round(price - risk * 3.0, 5)
+        else:
+            sl  = round(price - atr_buf, 5)
+            risk = abs(price - sl)
+            tp1 = round(price + risk * 2.0, 5)
+            tp2 = round(price + risk * 3.0, 5)
+
+    return sl, tp1, tp2
 
 def check_active_trades():
     trades = load_trades()
-    for trade_id, trade in list(trades.items()):
-        pair = trade['pair']
-        latest = fetch_candles(pair, 'H1', count=2)
-        if not latest: continue
+    if not trades:
+        return
+    print('  Checking ' + str(len(trades)) + ' active trade(s)...')
+    NL = chr(10)
 
-        price, dir_, entry, sl, tp1, tp2 = latest[-1]['close'], trade['direction'], trade['entry'], trade['sl'], trade['tp1'], trade['tp2']
-        pips = round(abs(price - entry) / pip_size(pair), 1) * (1 if (dir_ == 'BUY' and price > entry) or (dir_ == 'SELL' and price < entry) else -1)
-        
-        sl_hit = (dir_ == 'BUY' and price <= sl) or (dir_ == 'SELL' and price >= sl)
-        tp1_hit = (not trade.get('tp1_hit')) and ((dir_ == 'BUY' and price >= tp1) or (dir_ == 'SELL' and price <= tp1))
-        tp2_hit = (dir_ == 'BUY' and price >= tp2) or (dir_ == 'SELL' and price <= tp2)
+    for pair, trade in list(trades.items()):
+        latest = fetch_candles(trade['pair'], 'H1', count=2)
+        if not latest:
+            continue
+        price     = latest[-1]['close']
+        direction = trade['direction']
+        entry     = trade['entry']
+        sl        = trade['sl']
+        tp1       = trade['tp1']
+        tp2       = trade['tp2']
+        tp1_hit   = trade.get('tp1_hit', False)
+
+        if direction == 'BUY':
+            pips = calc_pips(price - entry, pair)
+        else:
+            pips = calc_pips(entry - price, pair)
+
+        pips_str = ('+' if pips >= 0 else '') + str(pips) + ' pips'
+
+        sl_hit = (direction == 'BUY' and price <= sl) or (direction == 'SELL' and price >= sl)
+        tp1_newly_hit = (not tp1_hit) and ((direction == 'BUY' and price >= tp1) or (direction == 'SELL' and price <= tp1))
+        tp2_hit = (direction == 'BUY' and price >= tp2) or (direction == 'SELL' and price <= tp2)
+
+        prompt = (
+            'You are an FXAlexG trade manager. ' +
+            'Analyse this open trade and give a hold or exit recommendation. ' +
+            'PAIR: ' + pair.replace('_', '/') + ' ' +
+            'DIRECTION: ' + direction + ' ' +
+            'ENTRY: ' + str(entry) + ' ' +
+            'CURRENT PRICE: ' + str(price) + ' ' +
+            'STOP LOSS: ' + str(sl) + ' ' +
+            'TAKE PROFIT 1: ' + str(tp1) + ' ' +
+            'TAKE PROFIT 2: ' + str(tp2) + ' ' +
+            'P&L: ' + pips_str + ' ' +
+            'Reply with EXACTLY: ' +
+            'RECOMMENDATION: [HOLD / EXIT NOW / MOVE SL TO BREAKEVEN] ' +
+            'REASON: [one sentence]'
+        )
+        analysis = ask_gemini(prompt)
 
         if sl_hit:
-            send_telegram(f"🔴 STOP LOSS HIT\n{pair} {dir_}\nLoss: {pips} pips\nClosed.")
-            remove_trade(trade_id)
+            msg = (
+                'STOP LOSS HIT' + NL +
+                pair.replace('_', '/') + ' ' + direction + NL + NL +
+                'Entry: ' + str(entry) + NL +
+                'SL hit at: ' + str(price) + NL +
+                'Loss: ' + pips_str + NL + NL +
+                'Trade closed. Removed from tracker.'
+            )
+            send_telegram(msg)
+            remove_trade(pair)
+            print('  SL hit - trade removed: ' + pair)
+
         elif tp2_hit:
-            send_telegram(f"🏆 TP2 HIT (Full Target)\n{pair} {dir_}\nProfit: {pips} pips\nClosed.")
-            remove_trade(trade_id)
-        elif tp1_hit:
-            trades[trade_id]['tp1_hit'] = True
-            trades[trade_id]['sl'] = entry # AUTO BREAKEVEN
+            msg = (
+                'TP2 HIT - FULL TARGET REACHED' + NL +
+                pair.replace('_', '/') + ' ' + direction + NL + NL +
+                'Entry: ' + str(entry) + NL +
+                'TP2 hit at: ' + str(price) + NL +
+                'Profit: ' + pips_str + NL + NL +
+                'Trade closed. Well done!'
+            )
+            send_telegram(msg)
+            remove_trade(pair)
+            print('  TP2 hit - trade removed: ' + pair)
+
+        elif tp1_newly_hit:
+            trades[pair]['tp1_hit'] = True
             save_trades(trades)
-            send_telegram(f"✅ TP1 HIT\n{pair} {dir_}\nProfit: {pips} pips\n\n🔒 Stop Loss moved to Breakeven.")
+            msg = (
+                'TP1 HIT' + NL +
+                pair.replace('_', '/') + ' ' + direction + NL + NL +
+                'Entry: ' + str(entry) + NL +
+                'TP1 hit at: ' + str(price) + NL +
+                'Profit so far: ' + pips_str + NL + NL +
+                'Consider moving SL to breakeven.' + NL +
+                'Watching for TP2 at: ' + str(tp2)
+            )
+            send_telegram(msg)
+            print('  TP1 hit: ' + pair)
+
+        else:
+            emoji = '' if pips >= 0 else ''
+            msg = (
+                emoji + ' Trade Update' + NL +
+                pair.replace('_', '/') + ' ' + direction + NL + NL +
+                'Entry: ' + str(entry) + NL +
+                'Current: ' + str(price) + NL +
+                'P&L: ' + pips_str + NL +
+                'TP1: ' + str(tp1) + ' | TP2: ' + str(tp2) + NL +
+                'SL: ' + str(sl) + NL + NL +
+                (analysis if analysis else 'RECOMMENDATION: HOLD' + NL + 'REASON: Monitor price action.')
+            )
+            send_telegram(msg)
+            print('  Trade update sent: ' + pair + ' ' + pips_str)
+
+
+def can_ict_alert():
+    return True
+
+def mark_ict_alerted():
+    pass
 
 # ─────────────────────────────────────────────
-# ICT KILLZONE & ANALYSIS WRAPPERS
+# STRATEGY 1 - FXALEXG ANALYSER
 # ─────────────────────────────────────────────
-# [ICT Logic Remains the same as previous file, truncated here for space but fully active]
-def get_asian_range(candles): return {'high': max(c['high'] for c in candles), 'low': min(c['low'] for c in candles)} if candles else None
-
 def analyse_fxalexg(pair):
     print("  [FXAlexG] " + pair)
-    trends, all_aois, h1_ema, h1_candles, h4_candles = {}, [], None, [], []
+    trends     = {}
+    all_aois   = []
+    best_hs    = None
+    h1_ema     = None
+    ema_sig    = None
+    h1_candles  = []
+    h4_candles  = []
+    m15_candles = []
 
     for tf in TIMEFRAMES:
         candles = fetch_candles(pair, tf)
-        if len(candles) < 20: continue
+        if len(candles) < 20:
+            continue
         h, l = swing_points(candles)
         trends[tf] = trend(h, l, candles)
-        if tf in ('D', 'W'): all_aois.extend(detect_aois(candles, pair))
-        if tf == 'H4': h4_candles = candles
-        if tf == 'H1': h1_ema = ema50(candles); h1_candles = candles
+        # AOI: Daily and Weekly only (FXAlexG rule)
+        if tf in ('D', 'W'):
+            all_aois.extend(detect_aois(candles, pair))
+        # H&S: H4 and H1 only
+        if tf in ('H4', 'H1'):
+            hs = detect_hs(candles, h, l)
+            if hs and (best_hs is None or
+                       (hs['complete'] and not best_hs['complete'])):
+                best_hs = hs
+        # Store candles for each entry timeframe
+        if tf == 'H4':
+            h4_candles = candles
+        if tf == 'H1':
+            h1_ema = ema50(candles)
+            if h1_ema:
+                last_close = candles[-1]['close']
+                ema_sig = 'ABOVE' if last_close > h1_ema else 'BELOW'
+            h1_candles = candles
+        if tf == 'M15':
+            m15_candles = candles
 
-    if not trends or not h1_candles: return
-    price = h1_candles[-1]['close']
-    direction = 'BUY' if sum(1 for t in trends.values() if t == 'BULLISH') > sum(1 for t in trends.values() if t == 'BEARISH') else 'SELL'
-    
-    entry_signal = detect_entry_signal(h4_candles, direction) or detect_entry_signal(h1_candles, direction)
-    aoi_zone = at_aoi(price, all_aois, pair)
-    ema_sig = 'ABOVE' if (h1_ema and price > h1_ema) else 'BELOW'
-    
-    grade, pts, reasons = score(trends, direction, aoi_zone, None, ema_sig, entry_signal)
-    
-    if grade in MIN_GRADE_TO_ALERT:
-        sl, tp1, tp2 = calc_sl_tp(direction, price, aoi_zone, pair, all_aois, h1_candles)
-        send_telegram(f"🔵 FXAlexG Alert: {pair} [{grade}]\nDirection: {direction}\nScore: {pts}/10\nEntry: {price}\nSL: {sl}\nTP1: {tp1}")
-        if grade == 'A+': add_trade(pair, direction, price, sl, tp1, tp2)
+    if not trends:
+        return
 
+    latest = fetch_candles(pair, 'H1', count=2)
+    if not latest:
+        return
+    price = latest[-1]['close']
+
+    # Determine trade direction from majority trend
+    bullish_count = sum(1 for t in trends.values() if t == 'BULLISH')
+    bearish_count = sum(1 for t in trends.values() if t == 'BEARISH')
+    direction = 'BUY' if bullish_count > bearish_count else 'SELL' if bearish_count > bullish_count else None
+
+    # FXAlexG rule: need at least 3 TFs agreeing to trade
+    # If majority not strong enough - skip
+    majority_count = max(bullish_count, bearish_count)
+    if majority_count < 3:
+        print('     Skipped - less than 3 TFs aligned (need 3 minimum)')
+        return
+
+    # Filter H&S pattern - must match majority direction
+    # Bearish majority = only accept H&S (bearish)
+    # Bullish majority = only accept Inverse H&S (bullish)
+    if best_hs:
+        if direction == 'SELL' and best_hs['direction'] != 'BEARISH':
+            best_hs = None  # discard bullish pattern in bearish market
+        if direction == 'BUY' and best_hs['direction'] != 'BULLISH':
+            best_hs = None  # discard bearish pattern in bullish market
+
+    # Detect entry signals on H4, H1, M15 - highest TF takes priority
+    # H4 pattern = strongest conviction
+    # H1 pattern = good conviction
+    # M15 pattern = entry trigger
+    entry_signal    = None
+    entry_tf        = None
+
+    if direction:
+        if h4_candles and len(h4_candles) >= 3:
+            sig = detect_entry_signal(h4_candles, direction)
+            if sig:
+                entry_signal = sig
+                entry_tf     = 'H4'
+
+        if entry_signal is None and h1_candles and len(h1_candles) >= 3:
+            sig = detect_entry_signal(h1_candles, direction)
+            if sig:
+                entry_signal = sig
+                entry_tf     = 'H1'
+
+        if entry_signal is None and m15_candles and len(m15_candles) >= 3:
+            sig = detect_entry_signal(m15_candles, direction)
+            if sig:
+                entry_signal = sig
+                entry_tf     = 'M15'
+
+    aoi_zone        = at_aoi(price, all_aois, pair)
+    grade, pts, reasons = score(trends, aoi_zone, best_hs, ema_sig, entry_signal, entry_tf)
+    print("     Grade: " + grade + " | Score: " + str(pts) + " | Trends: " + str(trends))
+
+    if grade not in MIN_GRADE_TO_ALERT:
+        return
+
+    # Calculate SL and TP using AOI-based method
+    sl, tp1, tp2 = calc_sl_tp(direction, price, aoi_zone, pair, all_aois, h1_candles)
+
+    data = {
+        'price':        price,
+        'trends':       trends,
+        'aoi':          aoi_zone,
+        'all_aois':     all_aois,
+        'ema':          round(h1_ema, 5) if h1_ema else 'N/A',
+        'ema_sig':      ema_sig or 'N/A',
+        'hs':           best_hs,
+        'entry_signal': entry_signal,
+        'entry_tf':     entry_tf,
+        'grade':        grade,
+        'pts':          pts,
+        'reasons':      reasons,
+        'direction':    direction,
+        'sl':           sl,
+        'tp1':          tp1,
+        'tp2':          tp2,
+    }
+
+    analysis = ask_gemini_fxalexg(pair, data)
+    if not analysis:
+        return
+
+    bullish = sum(1 for t in trends.values() if t == 'BULLISH')
+    bearish = sum(1 for t in trends.values() if t == 'BEARISH')
+    emoji   = 'G' if bullish > bearish else 'R' if bearish > bullish else 'Y'
+    emojis  = {'G': '🟢', 'R': '🔴', 'Y': '🟡'}
+
+    reasons_txt = ""
+    for r in reasons:
+        reasons_txt += "  " + r + "\n"
+
+    es    = data.get('entry_signal')
+    es_tf = data.get('entry_tf', '')
+    es_line = (
+        "Entry Signal: " + es['pattern'] + " on " + es_tf + " @ " + str(es['entry']) + "\n"
+        if es else "Entry Signal: Waiting for confirmation\n"
+    )
+
+    # Risk in pips
+    risk_pips = round(abs(price - sl) / pip_size(pair), 1)
+
+    msg = (
+        emojis[emoji] + " <b>FXAlexG Alert</b>\n"
+        "<b>" + pair.replace('_', '/') + "  [" + grade + "]  Score: " + str(pts) + "/10</b>\n\n"
+        "Price: <code>" + str(price) + "</code>\n"
+        "Direction: " + direction + "\n"
+        "Time: " + datetime.now(timezone.utc).strftime('%H:%M UTC') + "\n"
+        + es_line +
+        "\nSL: <code>" + str(sl) + "</code> (above AOI, risk " + str(risk_pips) + " pips)\n"
+        "TP1: <code>" + str(tp1) + "</code> (next AOI)\n"
+        "TP2: <code>" + str(tp2) + "</code> (next AOI far edge)\n"
+        "\n<b>Confluences:</b>\n" + reasons_txt + "\n"
+        "<b>Analysis:</b>\n" + analysis
+    )
+    send_telegram(msg)
+
+    # Add to trade tracker only for A+ grades
+    if grade == 'A+':
+        add_trade(pair, direction, price, sl, tp1, tp2, aoi_zone)
+        print("     Trade added to tracker")
+
+    print("     Alert sent [" + grade + "]")
+
+# ─────────────────────────────────────────────
+# STRATEGY 2 - ICT KILLZONE ANALYSER (XAU/USD)
+# ─────────────────────────────────────────────
+def analyse_ict_gold():
+    print("  [ICT Killzone] XAU_USD")
+    now_utc  = datetime.now(timezone.utc)
+    killzone = in_killzone(now_utc)
+
+    if not killzone:
+        print("     Not in killzone - skipping ICT analysis")
+        return
+
+    print("     In " + killzone + " killzone")
+
+    if not can_ict_alert():
+        print("     Skipped - ICT cooldown active")
+        return
+
+    # Fetch M15 candles (last 48 candles = 12 hours)
+    m15_candles = fetch_candles('XAU_USD', 'M15', count=48)
+    if len(m15_candles) < 10:
+        print("     Not enough M15 data")
+        return
+
+    # Get daily candles for bias
+    d_candles = fetch_candles('XAU_USD', 'D', count=10)
+    h_d, l_d  = swing_points(d_candles) if d_candles else ([], [])
+    daily_bias = trend(h_d, l_d, d_candles)
+
+    # Asian range
+    asian = get_asian_range(m15_candles)
+    if not asian:
+        print("     Asian range not available yet")
+        return
+
+    print("     Asian Range: " + str(asian['low']) + " - " + str(asian['high']))
+
+    # Sweep detection
+    sweep = detect_sweep(m15_candles, asian)
+
+    # FVG detection
+    fvg = detect_fvg(m15_candles[-10:])
+
+    # Current price
+    price = m15_candles[-1]['close']
+
+    # Need at least sweep OR fvg to alert
+    if not sweep and not fvg:
+        print("     No sweep or FVG detected")
+        return
+
+    # Check sweep direction aligns with daily bias
+    if sweep:
+        if daily_bias == 'BULLISH' and sweep['direction'] == 'SELL':
+            print("     Sweep against daily bias - skipping")
+            return
+        if daily_bias == 'BEARISH' and sweep['direction'] == 'BUY':
+            print("     Sweep against daily bias - skipping")
+            return
+
+    data = {
+        'price':       price,
+        'killzone':    killzone,
+        'asian':       asian,
+        'sweep':       sweep,
+        'fvg':         fvg,
+        'daily_bias':  daily_bias,
+    }
+
+    analysis = ask_gemini_ict(data)
+    if not analysis:
+        return
+
+    sweep_txt = ""
+    fvg_txt   = ""
+
+    if sweep:
+        sweep_txt = (
+            "\n<b>Liquidity Sweep:</b>\n"
+            "  " + sweep['type'] + "\n"
+            "  Swept: " + str(sweep['swept']) + "\n"
+            "  Asian Level: " + str(sweep['level']) + "\n"
+        )
+
+    if fvg:
+        fvg_txt = (
+            "\n<b>Fair Value Gap:</b>\n"
+            "  " + fvg['type'] + "\n"
+            "  Zone: " + str(fvg['bottom']) + " - " + str(fvg['top']) + "\n"
+            "  Size: " + str(fvg['size']) + " points\n"
+        )
+
+    emoji = '🟢' if daily_bias == 'BULLISH' else '🔴' if daily_bias == 'BEARISH' else '🟡'
+
+    msg = (
+        emoji + " <b>ICT Killzone Alert</b>\n"
+        "<b>XAU/USD (Gold)</b>\n\n"
+        "Price: <code>" + str(price) + "</code>\n"
+        "Time: " + datetime.now(timezone.utc).strftime('%H:%M UTC') + "\n"
+        "Session: " + killzone + " Killzone\n"
+        "Daily Bias: " + daily_bias + "\n\n"
+        "<b>Asian Range:</b>\n"
+        "  High: " + str(asian['high']) + "\n"
+        "  Low:  " + str(asian['low']) + "\n"
+        + sweep_txt + fvg_txt +
+        "\n<b>Analysis:</b>\n" + analysis
+    )
+    send_telegram(msg)
+    mark_ict_alerted()
+    print("     ICT Alert sent!")
+
+# ─────────────────────────────────────────────
+# MAIN - single scan, triggered by GitHub Actions
+# ─────────────────────────────────────────────
 def main():
-    print("Starting Scan...")
-    check_news_alerts()
-    check_active_trades()
-    for pair in PAIRS: analyse_fxalexg(pair)
+    print("=" * 55)
+    print("  FXAlexG + ICT Killzone Monitor - Single Scan")
+    print("=" * 55)
+    print("Scan @ " + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'))
+
+    print("\n--- Checking Active Trades ---")
+    try:
+        check_active_trades()
+    except Exception as e:
+        print("  ERROR checking trades: " + str(e))
+
+    print("\n--- Strategy 1: FXAlexG (All 9 Pairs) ---")
+    for pair in PAIRS:
+        try:
+            analyse_fxalexg(pair)
+            time.sleep(1)
+        except Exception as e:
+            print("  ERROR " + pair + ": " + str(e))
+
+    print("\n--- Strategy 2: ICT Killzone (XAU/USD) ---")
+    try:
+        analyse_ict_gold()
+    except Exception as e:
+        print("  ERROR ICT: " + str(e))
+
+    print("\nScan complete.")
 
 if __name__ == "__main__":
     main()
