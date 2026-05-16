@@ -45,7 +45,7 @@ TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "")
 PAIRS = [
     'EUR_USD', 'GBP_USD', 'USD_JPY', 'AUD_USD',
     'USD_CHF', 'NZD_USD', 'USD_CAD', 'XAU_USD', 'BTC_USD'
-]
+]  # XAU_USD runs in both FXAlexG and ICT strategies
 TIMEFRAMES         = ['W', 'D', 'H4', 'H1', 'M15']
 EMA_PERIOD         = 50
 MAX_AOI_PIPS       = 60
@@ -298,11 +298,13 @@ def detect_aois(candles, pair):
     return zones
 
 def at_aoi(price, zones, pair):
-    buf = from_pips(5, pair)
-    for z in zones:
-        if (z['bottom'] - buf) <= price <= (z['top'] + buf):
-            return z
-    return None
+    # Find all zones price is currently inside
+    buf      = from_pips(5, pair)
+    matches  = [z for z in zones if (z['bottom'] - buf) <= price <= (z['top'] + buf)]
+    if not matches:
+        return None
+    # Return the STRONGEST matching zone (highest aoi_pts, then most reversals)
+    return max(matches, key=lambda z: (z.get('aoi_pts', 1.0), z.get('reversals', 0)))
 
 # ─────────────────────────────────────────────
 # HEAD & SHOULDERS DETECTOR (FXAlexG)
@@ -456,43 +458,40 @@ def detect_entry_signal(candles, direction):
 # ─────────────────────────────────────────────
 def score(trends, aoi_zone, hs, ema_sig, entry_signal=None, entry_tf=None):
     # ─── POINT SYSTEM ─────────────────────────────
-    # Weekly Trend:    1.5
-    # Daily Trend:     1.5
-    # H4 Trend:        1.0
-    # H1 Trend:        1.0
-    # Strong AOI:      3.0  (5+ touches, 4+ reversals, <=45 pips)
-    # Good AOI:        1.0  (3+ touches, 3+ reversals, <=60 pips)
-    # 50 EMA:          1.0
-    # Head & Shoulders:0.5
-    # H1 Entry Signal: 0.5
-    # MAX TOTAL:       10.0
-    # A+ >= 8.0   B+ >= 7.0
+    # Weekly Trend:     1.5
+    # Daily Trend:      1.5
+    # H4 Trend:         1.0
+    # H1 Trend:         1.0
+    # Strong AOI:       2.5  (5+ touches, 4+ reversals, <=45 pips)
+    # Good AOI:         1.5  (3+ touches, 3+ reversals, <=60 pips)
+    # 50 EMA:           1.0  (price on correct side for direction)
+    # Head & Shoulders: 1.0
+    # Entry Signal:     0.5
+    # MAX TOTAL:        10.0  A+ >= 8.0  B+ >= 7.0
     # ──────────────────────────────────────────────
     pts     = 0.0
     reasons = []
 
-    # Individual TF points
-    tf_pts = {'W': 1.5, 'D': 1.5, 'H4': 1.0, 'H1': 1.0}
-    tf_names = {'W': 'Weekly', 'D': 'Daily', 'H4': '4H', 'H1': '1H'}
+    # Calculate majority direction ONCE before loop
+    bullish_tfs = sum(1 for tf in ['W','D','H4','H1'] if trends.get(tf) == 'BULLISH')
+    bearish_tfs = sum(1 for tf in ['W','D','H4','H1'] if trends.get(tf) == 'BEARISH')
+    majority_dir = 'BULLISH' if bullish_tfs >= bearish_tfs else 'BEARISH'
+    majority_tfs = max(bullish_tfs, bearish_tfs)
 
-    bullish_tfs = 0
-    bearish_tfs = 0
+    # TF points - only W/D/H4/H1, NOT M15
+    tf_pts   = {'W': 1.5, 'D': 1.5, 'H4': 1.0, 'H1': 1.0}
+    tf_names = {'W': 'Weekly', 'D': 'Daily', 'H4': '4H', 'H1': '1H'}
 
     for tf in ['W', 'D', 'H4', 'H1']:
         t = trends.get(tf, 'NEUTRAL')
-        direction_majority = 'BULLISH' if sum(1 for x in trends.values() if x == 'BULLISH') > sum(1 for x in trends.values() if x == 'BEARISH') else 'BEARISH'
-        if t == 'BULLISH':
-            bullish_tfs += 1
+        if t == majority_dir:
             pts += tf_pts[tf]
-            reasons.append(tf_names[tf] + ': BULLISH (+' + str(tf_pts[tf]) + ')')
-        elif t == 'BEARISH':
-            bearish_tfs += 1
-            pts += tf_pts[tf]
-            reasons.append(tf_names[tf] + ': BEARISH (+' + str(tf_pts[tf]) + ')')
-        else:
+            reasons.append(tf_names[tf] + ': ' + t + ' (+' + str(tf_pts[tf]) + ')')
+        elif t == 'NEUTRAL':
             reasons.append(tf_names[tf] + ': NEUTRAL')
-
-    majority_tfs = max(bullish_tfs, bearish_tfs)
+        else:
+            # Opposite direction - no points, flag it
+            reasons.append(tf_names[tf] + ': ' + t + ' (against majority)')
 
     # AOI points
     if aoi_zone:
@@ -507,11 +506,16 @@ def score(trends, aoi_zone, hs, ema_sig, entry_signal=None, entry_tf=None):
     else:
         reasons.append('Not at AOI')
 
-    # EMA
+    # EMA - only counts if price is on correct side for the direction
     if ema_sig:
-        pts += 1.0
-        side = 'above' if ema_sig == 'ABOVE' else 'below'
-        reasons.append('H1 price ' + side + ' 50 EMA (+1.0)')
+        ema_correct = (majority_dir == 'BULLISH' and ema_sig == 'ABOVE') or                       (majority_dir == 'BEARISH' and ema_sig == 'BELOW')
+        if ema_correct:
+            pts += 1.0
+            side = 'above' if ema_sig == 'ABOVE' else 'below'
+            reasons.append('H1 price ' + side + ' 50 EMA (+1.0)')
+        else:
+            side = 'above' if ema_sig == 'ABOVE' else 'below'
+            reasons.append('H1 price ' + side + ' 50 EMA (against direction)')
 
     # H&S
     if hs and hs['complete']:
@@ -845,9 +849,9 @@ def calc_sl_tp(direction, price, aoi_zone, pair, all_aois, candles=None):
         tp1 = None
         tp2 = None
         for idx, z in enumerate(higher_aois):
-            # TP1 must be inside this AOI AND at least 2R away
-            if z['bottom'] >= min_tp1 or z['top'] >= min_tp1:
-                # Entry + 2R lands inside or above this AOI bottom
+            # TP1 must be at or above the bottom of this AOI with at least 2R
+            if z['top'] >= min_tp1:
+                # Use the greater of min_tp1 or zone bottom
                 tp1 = round(max(min_tp1, z['bottom']), 5)
                 # TP2 = bottom of NEXT AOI above TP1 zone
                 if idx + 1 < len(higher_aois):
@@ -874,8 +878,8 @@ def calc_sl_tp(direction, price, aoi_zone, pair, all_aois, candles=None):
         tp1 = None
         tp2 = None
         for idx, z in enumerate(lower_aois):
-            # TP1 must be inside this AOI AND at least 2R below
-            if z['top'] <= min_tp1 or z['bottom'] <= min_tp1:
+            # TP1 must be at or below the top of this AOI with at least 2R
+            if z['bottom'] <= min_tp1:
                 tp1 = round(min(min_tp1, z['top']), 5)
                 # TP2 = top of NEXT AOI below TP1 zone
                 if idx + 1 < len(lower_aois):
@@ -906,14 +910,25 @@ def calc_sl_tp(direction, price, aoi_zone, pair, all_aois, candles=None):
 def check_active_trades():
     trades = load_trades()
     if not trades:
+        print('  No active trades.')
         return
     print('  Checking ' + str(len(trades)) + ' active trade(s)...')
-    NL = chr(10)
+    NL  = chr(10)
+    # Reload after each save to keep dict in sync
+    trades = load_trades()
 
-    for pair, trade in list(trades.items()):
-        latest = fetch_candles(trade['pair'], 'H1', count=2)
-        if not latest:
+    for pair in list(trades.keys()):
+        # Reload each iteration so saves don't corrupt loop
+        trades = load_trades()
+        if pair not in trades:
             continue
+        trade = trades[pair]
+
+        latest = fetch_candles(pair, 'H1', count=2)
+        if not latest:
+            print('  Could not fetch candles for ' + pair)
+            continue
+
         price     = latest[-1]['close']
         direction = trade['direction']
         entry     = trade['entry']
@@ -927,91 +942,90 @@ def check_active_trades():
         else:
             pips = calc_pips(entry - price, pair)
 
-        pips_str = ('+' if pips >= 0 else '') + str(pips) + ' pips'
+        sign     = '+' if pips >= 0 else ''
+        pips_str = sign + str(pips) + ' pips'
 
-        sl_hit = (direction == 'BUY' and price <= sl) or (direction == 'SELL' and price >= sl)
-        tp1_newly_hit = (not tp1_hit) and ((direction == 'BUY' and price >= tp1) or (direction == 'SELL' and price <= tp1))
-        tp2_hit = (direction == 'BUY' and price >= tp2) or (direction == 'SELL' and price <= tp2)
+        # Calculate RR achieved
+        risk = abs(entry - sl)
+        rr   = round(abs(price - entry) / risk, 2) if risk > 0 else 0
+        rr_str = ('+' if pips >= 0 else '-') + str(rr) + 'R'
 
-        prompt = (
-            'You are an FXAlexG trade manager. ' +
-            'Analyse this open trade and give a hold or exit recommendation. ' +
-            'PAIR: ' + pair.replace('_', '/') + ' ' +
-            'DIRECTION: ' + direction + ' ' +
-            'ENTRY: ' + str(entry) + ' ' +
-            'CURRENT PRICE: ' + str(price) + ' ' +
-            'STOP LOSS: ' + str(sl) + ' ' +
-            'TAKE PROFIT 1: ' + str(tp1) + ' ' +
-            'TAKE PROFIT 2: ' + str(tp2) + ' ' +
-            'P&L: ' + pips_str + ' ' +
-            'Reply with EXACTLY: ' +
-            'RECOMMENDATION: [HOLD / EXIT NOW / MOVE SL TO BREAKEVEN] ' +
-            'REASON: [one sentence]'
-        )
-        analysis = ask_gemini(prompt)
+        sl_hit        = ((direction == 'BUY'  and price <= sl) or
+                         (direction == 'SELL' and price >= sl))
+        tp1_newly_hit = ((not tp1_hit) and
+                         ((direction == 'BUY'  and price >= tp1) or
+                          (direction == 'SELL' and price <= tp1)))
+        tp2_hit       = ((direction == 'BUY'  and price >= tp2) or
+                         (direction == 'SELL' and price <= tp2))
 
         if sl_hit:
             msg = (
-                'STOP LOSS HIT' + NL +
-                pair.replace('_', '/') + ' ' + direction + NL + NL +
+                'SL HIT ' + NL +
+                pair.replace('_', '/') + ' ' + direction + NL +
                 'Entry: ' + str(entry) + NL +
-                'SL hit at: ' + str(price) + NL +
-                'Loss: ' + pips_str + NL + NL +
-                'Trade closed. Removed from tracker.'
+                'SL: ' + str(price) + NL +
+                'Loss: ' + pips_str + ' (' + rr_str + ')' + NL +
+                'Trade closed and removed from tracker.'
             )
             send_telegram(msg)
             remove_trade(pair)
-            print('  SL hit - trade removed: ' + pair)
+            print('  SL hit - removed: ' + pair)
 
         elif tp2_hit:
             msg = (
-                'TP2 HIT - FULL TARGET REACHED' + NL +
-                pair.replace('_', '/') + ' ' + direction + NL + NL +
+                'TP2 HIT - FULL TARGET ' + NL +
+                pair.replace('_', '/') + ' ' + direction + NL +
                 'Entry: ' + str(entry) + NL +
-                'TP2 hit at: ' + str(price) + NL +
-                'Profit: ' + pips_str + NL + NL +
+                'TP2: ' + str(price) + NL +
+                'Profit: ' + pips_str + ' (' + rr_str + ')' + NL +
                 'Trade closed. Well done!'
             )
             send_telegram(msg)
             remove_trade(pair)
-            print('  TP2 hit - trade removed: ' + pair)
+            print('  TP2 hit - removed: ' + pair)
 
         elif tp1_newly_hit:
+            # Mark TP1 hit but keep trade open for TP2
+            trades = load_trades()
             trades[pair]['tp1_hit'] = True
             save_trades(trades)
             msg = (
-                'TP1 HIT' + NL +
-                pair.replace('_', '/') + ' ' + direction + NL + NL +
+                'TP1 HIT ' + NL +
+                pair.replace('_', '/') + ' ' + direction + NL +
                 'Entry: ' + str(entry) + NL +
-                'TP1 hit at: ' + str(price) + NL +
-                'Profit so far: ' + pips_str + NL + NL +
-                'Consider moving SL to breakeven.' + NL +
-                'Watching for TP2 at: ' + str(tp2)
+                'TP1: ' + str(price) + NL +
+                'Profit: ' + pips_str + ' (' + rr_str + ')' + NL +
+                'Move SL to breakeven. Watching TP2: ' + str(tp2)
             )
             send_telegram(msg)
-            print('  TP1 hit: ' + pair)
+            print('  TP1 hit - keeping open for TP2: ' + pair)
 
         else:
-            emoji = '' if pips >= 0 else ''
+            # Regular hourly update - no Gemini needed
+            icon = '' if pips >= 0 else ''
             msg = (
-                emoji + ' Trade Update' + NL +
-                pair.replace('_', '/') + ' ' + direction + NL + NL +
-                'Entry: ' + str(entry) + NL +
+                icon + ' Trade Update' + NL +
+                pair.replace('_', '/') + ' ' + direction + NL +
+                'Entry:   ' + str(entry) + NL +
                 'Current: ' + str(price) + NL +
-                'P&L: ' + pips_str + NL +
+                'P&L:     ' + pips_str + ' (' + rr_str + ')' + NL +
                 'TP1: ' + str(tp1) + ' | TP2: ' + str(tp2) + NL +
-                'SL: ' + str(sl) + NL + NL +
-                (analysis if analysis else 'RECOMMENDATION: HOLD' + NL + 'REASON: Monitor price action.')
+                'SL:  ' + str(sl) + NL +
+                ('TP1 already hit - riding to TP2' if tp1_hit else 'Watching for TP1')
             )
             send_telegram(msg)
-            print('  Trade update sent: ' + pair + ' ' + pips_str)
+            print('  Update sent: ' + pair + ' ' + pips_str)
 
 
 def can_ict_alert():
-    return True
+    trades = load_trades()
+    last   = trades.get('_ict_last_alert', 0)
+    return (time.time() - last) > ICT_COOLDOWN_MIN * 60
 
 def mark_ict_alerted():
-    pass
+    trades = load_trades()
+    trades['_ict_last_alert'] = time.time()
+    save_trades(trades)
 
 # ─────────────────────────────────────────────
 # STRATEGY 1 - FXALEXG ANALYSER
@@ -1057,10 +1071,10 @@ def analyse_fxalexg(pair):
     if not trends:
         return
 
-    latest = fetch_candles(pair, 'H1', count=2)
-    if not latest:
+    # Use last H1 candle close - already fetched, no extra API call
+    if not h1_candles:
         return
-    price = latest[-1]['close']
+    price = h1_candles[-1]['close']
 
     # Determine trade direction from majority trend
     bullish_count = sum(1 for t in trends.values() if t == 'BULLISH')
@@ -1114,6 +1128,12 @@ def analyse_fxalexg(pair):
     print("     Grade: " + grade + " | Score: " + str(pts) + " | Trends: " + str(trends))
 
     if grade not in MIN_GRADE_TO_ALERT:
+        return
+
+    # Block new alert if this pair already has an active trade
+    active_trades = load_trades()
+    if pair in active_trades:
+        print('     Skipped - active trade already open for ' + pair)
         return
 
     # Calculate SL and TP using AOI-based method
