@@ -10,5 +10,17 @@
     "aoi_top": 1.3779,
     "aoi_bottom": 1.37357,
     "opened_at": "2026-05-19 04:27 UTC"
+  },
+  "EUR_USD": {
+    "pair": "EUR_USD",
+    "direction": "SELL",
+    "entry": 1.16366,
+    "sl": 1.16521,
+    "tp1": 1.11928,
+    "tp2": 1.1159,
+    "tp1_hit": false,
+    "aoi_top": 1.16372,
+    "aoi_bottom": 1.15802,
+    "opened_at": "2026-05-19 07:01 UTC"
   }
 }
