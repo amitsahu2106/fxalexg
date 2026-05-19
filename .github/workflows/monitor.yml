@@ -9,11 +9,15 @@ env:
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 4
+    timeout-minutes: 8
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
         uses: actions/setup-python@v5.6.0
@@ -23,17 +27,14 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Restore trades cache
-        uses: actions/cache@v4
-        with:
-          path: trades.json
-          key: trades-cache
-          restore-keys: trades-cache
-
       - name: Create trades file if missing
         run: |
           if [ ! -f trades.json ]; then
             echo '{}' > trades.json
+            echo "Created fresh trades.json"
+          else
+            echo "trades.json exists:"
+            cat trades.json
           fi
 
       - name: Run FXAlexG Monitor
@@ -43,11 +44,16 @@ jobs:
           GEMINI_API_KEY:     ${{ secrets.GEMINI_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
-          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
         run: python fxalexg_monitor.py
 
-      - name: Save trades cache
-        uses: actions/cache@v4
-        with:
-          path: trades.json
-          key: trades-cache
+      - name: Save trades back to repo
+        run: |
+          git config user.name  "FXAlexG Bot"
+          git config user.email "bot@fxalexg.com"
+          git add trades.json
+          if git diff --staged --quiet; then
+            echo "No trade changes to commit"
+          else
+            git commit -m "Update trades.json [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+            git push
+          fi
