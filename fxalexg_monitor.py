@@ -230,34 +230,55 @@ def ema50(candles):
 # ─────────────────────────────────────────────
 # AOI DETECTOR (FXAlexG)
 # ─────────────────────────────────────────────
-def count_reversals(candles, zone_top, zone_bot, pair):
-    # Count times price ENTERED zone and reversed direction
-    buf          = from_pips(3, pair)
+def count_touches_and_reversals(candles, zone_top, zone_bot, pair):
+    # Count how many times price ENTERED the zone (touches)
+    # and how many times it REVERSED direction after entering (reversals)
+    # Rule: reversals can NEVER exceed touches
+    mid          = (zone_top + zone_bot) / 2
+    touches      = 0
     reversals    = 0
     inside       = False
     entered_from = None
+
     for c in candles:
+        # Use BODY closes only - price must actually close inside zone
         bh      = body_high(c)
         bl      = body_low(c)
-        price   = c['close']
-        in_zone = bl <= zone_top + buf and bh >= zone_bot - buf
+        close   = c['close']
+
+        # Price is inside zone if body close is within zone bounds
+        in_zone = (close >= zone_bot and close <= zone_top)
+
         if in_zone and not inside:
+            # Price just entered the zone
             inside       = True
-            entered_from = 'above' if c['open'] > (zone_top + zone_bot) / 2 else 'below'
+            touches     += 1
+            # Entered from above if it came down into zone
+            entered_from = 'above' if c['open'] > zone_top else 'below'
+
         elif not in_zone and inside:
+            # Price just left the zone
             inside = False
-            if entered_from == 'above' and price < zone_bot:
+            # Only count reversal if it left the OPPOSITE side it entered from
+            if entered_from == 'above' and close > zone_top:
+                # Entered from above, left from above = REVERSAL (bounced up)
                 reversals += 1
-            elif entered_from == 'below' and price > zone_top:
+            elif entered_from == 'below' and close < zone_bot:
+                # Entered from below, left from below = REVERSAL (bounced down)
                 reversals += 1
-    return reversals
+            # else: price broke through = NOT a reversal
+
+    # Safety cap - reversals cannot exceed touches
+    reversals = min(reversals, touches)
+    return touches, reversals
 
 def detect_aois(candles, pair):
     # Two-tier AOI system:
-    # STRONG AOI: >= 5 touches, >= 4 reversals, <= 45 pips → 3.0 pts
-    # GOOD AOI:   >= 3 touches, >= 3 reversals, <= 60 pips → 1.0 pts
+    # STRONG AOI: >= 5 touches, >= 4 reversals, <= 45 pips -> 2.5 pts
+    # GOOD AOI:   >= 3 touches, >= 3 reversals, <= 60 pips -> 1.5 pts
+    # touches and reversals from SAME loop - always consistent
     highs, lows = swing_points(candles, lookback=3)
-    max_zone    = from_pips(60, pair)  # Max 60 pips for good AOI
+    max_zone    = from_pips(60, pair)
     levels      = sorted([p['price'] for p in highs + lows])
     zones, i    = [], 0
     while i < len(levels):
@@ -266,36 +287,36 @@ def detect_aois(candles, pair):
         while j < len(levels) and levels[j] - base <= max_zone:
             j += 1
         cluster = levels[i:j]
-        if len(cluster) >= 3:  # Minimum 3 touches
+        if len(cluster) >= 3:
             top     = max(cluster)
             bot     = min(cluster)
             sz_pips = to_pips(top - bot, pair)
             if sz_pips <= 60:
-                rev = count_reversals(candles, top, bot, pair)
-                # Classify AOI tier
-                if len(cluster) >= 5 and rev >= 4 and sz_pips <= 45:
+                # Single unified function - reversals can never exceed touches
+                touches, rev = count_touches_and_reversals(candles, top, bot, pair)
+                if touches >= 5 and rev >= 4 and sz_pips <= 45:
                     tier = 'STRONG'
                     pts  = 2.5
-                elif len(cluster) >= 3 and rev >= 3 and sz_pips <= 60:
+                elif touches >= 3 and rev >= 3 and sz_pips <= 60:
                     tier = 'GOOD'
                     pts  = 1.5
                 else:
                     i = j
-                    continue  # Does not qualify as either tier
+                    continue
                 zones.append({
                     'top':       top,
                     'bottom':    bot,
                     'mid':       (top + bot) / 2,
-                    'touches':   len(cluster),
+                    'touches':   touches,
                     'reversals': rev,
                     'tier':      tier,
                     'aoi_pts':   pts,
                     'size_pips': round(sz_pips, 1),
                 })
         i = j
-    # Sort strongest first
     zones.sort(key=lambda z: z['aoi_pts'], reverse=True)
     return zones
+
 
 def at_aoi(price, zones, pair):
     # Find all zones price is currently inside
