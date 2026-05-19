@@ -47,5 +47,17 @@
     "aoi_bottom": 1.3354,
     "opened_at": "2026-05-19 13:01 UTC"
   },
-  "_ict_last_alert": 1779195700.9075654
+  "_ict_last_alert": 1779195700.9075654,
+  "USD_CHF": {
+    "pair": "USD_CHF",
+    "direction": "BUY",
+    "entry": 0.78896,
+    "sl": 0.78782,
+    "tp1": 0.80029,
+    "tp2": 0.87698,
+    "tp1_hit": false,
+    "aoi_top": 0.79422,
+    "aoi_bottom": 0.78938,
+    "opened_at": "2026-05-19 21:01 UTC"
+  }
 }
