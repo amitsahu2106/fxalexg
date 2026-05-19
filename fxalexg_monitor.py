@@ -274,7 +274,7 @@ def count_touches_and_reversals(candles, zone_top, zone_bot, pair):
 
 def detect_aois(candles, pair):
     # Two-tier AOI system:
-    # STRONG AOI: >= 5 touches, >= 4 reversals, <= 45 pips -> 2.5 pts
+    # STRONG AOI: >= 5 touches, >= 4 reversals, <= 60 pips -> 2.5 pts
     # GOOD AOI:   >= 3 touches, >= 3 reversals, <= 60 pips -> 1.5 pts
     # touches and reversals from SAME loop - always consistent
     highs, lows = swing_points(candles, lookback=3)
@@ -294,7 +294,7 @@ def detect_aois(candles, pair):
             if sz_pips <= 60:
                 # Single unified function - reversals can never exceed touches
                 touches, rev = count_touches_and_reversals(candles, top, bot, pair)
-                if touches >= 5 and rev >= 4 and sz_pips <= 45:
+                if touches >= 5 and rev >= 4 and sz_pips <= 60:
                     tier = 'STRONG'
                     pts  = 2.5
                 elif touches >= 3 and rev >= 3 and sz_pips <= 60:
