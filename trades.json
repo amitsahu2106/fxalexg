@@ -22,5 +22,17 @@
     "aoi_top": 1.16372,
     "aoi_bottom": 1.15802,
     "opened_at": "2026-05-19 07:01 UTC"
+  },
+  "NZD_USD": {
+    "pair": "NZD_USD",
+    "direction": "SELL",
+    "entry": 0.58508,
+    "sl": 0.58869,
+    "tp1": 0.57747,
+    "tp2": 0.57474,
+    "tp1_hit": false,
+    "aoi_top": 0.58743,
+    "aoi_bottom": 0.58162,
+    "opened_at": "2026-05-19 08:01 UTC"
   }
 }
