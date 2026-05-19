@@ -34,5 +34,18 @@
     "aoi_top": 0.58743,
     "aoi_bottom": 0.58162,
     "opened_at": "2026-05-19 08:01 UTC"
-  }
+  },
+  "GBP_USD": {
+    "pair": "GBP_USD",
+    "direction": "BUY",
+    "entry": 1.3407,
+    "sl": 1.33332,
+    "tp1": 1.35546,
+    "tp2": 1.35731,
+    "tp1_hit": false,
+    "aoi_top": 1.34037,
+    "aoi_bottom": 1.3354,
+    "opened_at": "2026-05-19 13:01 UTC"
+  },
+  "_ict_last_alert": 1779195700.9075654
 }
