@@ -30,19 +30,21 @@ def from_pips(pips, pair):
     return pips * pip_size(pair)
 
 # ─── FETCH HISTORICAL DATA ───────────────────────────────────
-def fetch_range(pair, granularity, from_dt, to_dt):
+def fetch_chunk(pair, granularity, from_dt):
+    # Fetch up to 5000 candles starting from from_dt
+    # OANDA rule: use 'from' + 'count' only (never mix with 'to')
     url     = OANDA_BASE_URL + '/v3/instruments/' + pair + '/candles'
     headers = {'Authorization': 'Bearer ' + OANDA_API_KEY}
     params  = {
         'granularity': granularity,
         'from':        from_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
-        'to':          to_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
-        'price':       'M',
         'count':       5000,
+        'price':       'M',
     }
     try:
-        r = requests.get(url, headers=headers, params=params, timeout=20)
+        r = requests.get(url, headers=headers, params=params, timeout=30)
         if r.status_code != 200:
+            print('    OANDA ' + str(r.status_code) + ': ' + r.text[:100])
             return []
         out = []
         for c in r.json().get('candles', []):
@@ -60,20 +62,30 @@ def fetch_range(pair, granularity, from_dt, to_dt):
         return []
 
 def fetch_2years(pair, granularity):
-    # Fetch 2 years in chunks of 5000 candles
-    now    = datetime.now(timezone.utc)
-    start  = now - timedelta(days=730)
-    all_c  = []
-    chunk_start = start
-    while chunk_start < now:
-        chunk_end = min(chunk_start + timedelta(days=180), now)
-        candles   = fetch_range(pair, granularity, chunk_start, chunk_end)
-        all_c.extend(candles)
-        if not candles:
+    # Paginate from 2 years ago to now using from+count
+    now   = datetime.now(timezone.utc)
+    start = now - timedelta(days=730)
+    all_c = []
+    cursor = start
+
+    while cursor < now:
+        chunk = fetch_chunk(pair, granularity, cursor)
+        if not chunk:
             break
-        chunk_start = chunk_end + timedelta(seconds=1)
-        time.sleep(0.3)  # Rate limit protection
-    # Deduplicate by time
+        all_c.extend(chunk)
+        # Move cursor to just after last candle returned
+        last_time = chunk[-1]['time']
+        # Parse last time and advance by 1 second
+        last_dt = datetime.strptime(last_time[:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
+        next_cursor = last_dt + timedelta(seconds=1)
+        if next_cursor <= cursor:
+            break  # Safety - no progress
+        cursor = next_cursor
+        if len(chunk) < 100:
+            break  # Last page
+        time.sleep(0.5)
+
+    # Deduplicate and sort
     seen, unique = set(), []
     for c in all_c:
         if c['time'] not in seen:
