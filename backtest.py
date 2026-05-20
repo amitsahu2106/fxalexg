@@ -6,8 +6,10 @@
 import requests, os, time
 from datetime import datetime, timezone, timedelta
 
-OANDA_API_KEY  = os.environ.get('OANDA_API_KEY', '')
-OANDA_BASE_URL = 'https://api-fxpractice.oanda.com'
+OANDA_API_KEY      = os.environ.get('OANDA_API_KEY', '')
+OANDA_BASE_URL     = 'https://api-fxpractice.oanda.com'
+TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_CHAT_ID   = os.environ.get('TELEGRAM_CHAT_ID', '')
 
 PAIRS = [
     'EUR_USD', 'GBP_USD', 'USD_JPY', 'AUD_USD',
@@ -364,46 +366,38 @@ def calc_atr(candles, period=14):
         trs.append(tr)
     return sum(trs[-period:]) / period
 
-# ─── SL/TP - EXACT SAME AS MONITOR ──────────────────────────
+# ─── SL/TP - 1R and 2R based on ATR ─────────────────────────
+# SL  = ATR * 1.5 beyond AOI edge
+# TP1 = entry + risk * 1  (1:1 RR)
+# TP2 = entry + risk * 2  (2:1 RR)
 def calc_sl_tp(direction, price, aoi_zone, pair, all_aois, h1_candles):
     atr     = calc_atr(h1_candles)
     atr_buf = atr * 1.5 if atr else from_pips(10, pair)
 
     if direction == 'BUY' and aoi_zone:
-        sl      = round(aoi_zone['bottom'] - atr_buf, 5)
-        risk    = abs(price - sl)
-        min_tp1 = price + risk * 2.0
-        higher  = sorted([z for z in all_aois if z['bottom'] > aoi_zone['top']], key=lambda z: z['bottom'])
-        tp1 = tp2 = None
-        for idx, z in enumerate(higher):
-            if z['top'] >= min_tp1:
-                tp1 = round(max(min_tp1, z['bottom']), 5)
-                tp2 = round(higher[idx+1]['bottom'], 5) if idx+1 < len(higher) else round(z['top'] + from_pips(5, pair), 5)
-                break
-        if tp1 is None:
-            tp1 = round(price + risk * 2.0, 5)
-            tp2 = round(price + risk * 3.0, 5)
+        sl   = round(aoi_zone['bottom'] - atr_buf, 5)
+        risk = abs(price - sl)
+        tp1  = round(price + risk * 1.0, 5)   # TP1 = 1R
+        tp2  = round(price + risk * 2.0, 5)   # TP2 = 2R
 
     elif direction == 'SELL' and aoi_zone:
-        sl      = round(aoi_zone['top'] + atr_buf, 5)
-        risk    = abs(sl - price)
-        min_tp1 = price - risk * 2.0
-        lower   = sorted([z for z in all_aois if z['top'] < aoi_zone['bottom']], key=lambda z: z['top'], reverse=True)
-        tp1 = tp2 = None
-        for idx, z in enumerate(lower):
-            if z['bottom'] <= min_tp1:
-                tp1 = round(min(min_tp1, z['top']), 5)
-                tp2 = round(lower[idx+1]['top'], 5) if idx+1 < len(lower) else round(z['bottom'] - from_pips(5, pair), 5)
-                break
-        if tp1 is None:
-            tp1 = round(price - risk * 2.0, 5)
-            tp2 = round(price - risk * 3.0, 5)
+        sl   = round(aoi_zone['top'] + atr_buf, 5)
+        risk = abs(sl - price)
+        tp1  = round(price - risk * 1.0, 5)   # TP1 = 1R
+        tp2  = round(price - risk * 2.0, 5)   # TP2 = 2R
+
     else:
         atr_buf = atr * 1.5 if atr else from_pips(15, pair)
-        sl   = round(price + atr_buf if direction == 'SELL' else price - atr_buf, 5)
-        risk = abs(price - sl)
-        tp1  = round(price - risk * 2.0 if direction == 'SELL' else price + risk * 2.0, 5)
-        tp2  = round(price - risk * 3.0 if direction == 'SELL' else price + risk * 3.0, 5)
+        if direction == 'SELL':
+            sl  = round(price + atr_buf, 5)
+            risk = abs(sl - price)
+            tp1 = round(price - risk * 1.0, 5)
+            tp2 = round(price - risk * 2.0, 5)
+        else:
+            sl  = round(price - atr_buf, 5)
+            risk = abs(price - sl)
+            tp1 = round(price + risk * 1.0, 5)
+            tp2 = round(price + risk * 2.0, 5)
 
     return sl, tp1, tp2
 
@@ -458,15 +452,16 @@ def simulate_trade(direction, entry, sl, tp1, tp2, future_candles):
 # ─── BACKTEST ONE PAIR ───────────────────────────────────────
 def backtest_pair(pair, h1_all, w_all, d_all, h4_all):
     print(chr(10) + '  ' + pair.replace('_', '/') + '...')
-    trades     = []
-    open_trade = None
-    WARMUP     = 120  # candles needed for indicators to stabilise
+    trades        = []
+    open_trade    = None
+    exit_bar      = -1   # bar index where last trade closed
+    WARMUP        = 120  # candles needed for indicators to stabilise
 
     for i in range(WARMUP, len(h1_all) - 5):
         candle_time = h1_all[i]['time']
         price       = h1_all[i]['close']  # Entry on CLOSE of candle
 
-        # If trade open - check close-based SL/TP
+        # If trade open - simulate forward from current bar
         if open_trade:
             result, res_time, res_price, tp1_was_hit = simulate_trade(
                 open_trade['direction'],
@@ -483,10 +478,10 @@ def backtest_pair(pair, h1_all, w_all, d_all, h4_all):
                 tp2   = open_trade['tp2']
                 if result == 'TP2':
                     pips = to_pips(abs(res_price - entry), pair)
-                    rr   = 3.0
+                    rr   = 2.0
                 elif result == 'TP1':
                     pips = to_pips(abs(tp1 - entry), pair)
-                    rr   = 2.0
+                    rr   = 1.0
                 else:
                     pips = -to_pips(abs(entry - sl), pair)
                     rr   = -1.0
@@ -494,6 +489,16 @@ def backtest_pair(pair, h1_all, w_all, d_all, h4_all):
                                    'exit_price': res_price, 'pips': pips, 'rr': rr})
                 trades.append(open_trade)
                 open_trade = None
+                # Find exit bar index so we skip analysis until after trade closed
+                exit_bar = next(
+                    (j for j in range(i, min(i+500, len(h1_all)))
+                     if h1_all[j]['time'] >= res_time),
+                    i
+                )
+            continue
+
+        # Block new trade until we are past the exit bar of last trade
+        if i <= exit_bar:
             continue
 
         # Get candle windows up to current bar (no look-ahead)
@@ -614,10 +619,64 @@ def backtest_pair(pair, h1_all, w_all, d_all, h4_all):
 
     return trades
 
+# ─── SEND TELEGRAM ───────────────────────────────────────────
+def send_telegram(msg):
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        print('  Telegram not configured - printing only')
+        return
+    try:
+        url  = 'https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN + '/sendMessage'
+        data = {'chat_id': TELEGRAM_CHAT_ID, 'text': msg, 'parse_mode': 'HTML'}
+        requests.post(url, json=data, timeout=10)
+    except Exception as e:
+        print('  Telegram error: ' + str(e))
+
 # ─── PRINT RESULTS ───────────────────────────────────────────
 def print_results(all_trades):
     NL = chr(10)
     SEP = '=' * 80
+    # ── Send summary to Telegram ──────────────────────────────
+    NL2 = chr(10)
+    tg_summary = (
+        '<b>FXAlexG Backtest Results - 2 Years</b>' + NL2 +
+        'TP1=1R, TP2=2R | Entry on candle close' + NL2 + NL2 +
+        '<b>OVERALL:</b>' + NL2 +
+        'A+ Signals: ' + str(len(all_trades)) + NL2 +
+        'Closed: ' + str(total) + NL2 +
+        'TP2 (2R wins): ' + str(len(tp2s)) + NL2 +
+        'TP1 (1R wins): ' + str(len(tp1s)) + NL2 +
+        'SL (losses):   ' + str(len(sls)) + NL2 +
+        'Win Rate: <b>' + str(wr) + '%</b>' + NL2 +
+        'Avg Win:  +' + str(avg_win) + ' pips' + NL2 +
+        'Avg Loss: ' + str(avg_sl) + ' pips' + NL2 +
+        'Total P&L: ' + str(tot_pip) + ' pips' + NL2 +
+        'Profit Factor: ' + str(pf) + NL2 +
+        'Max Consec. Losses: ' + str(max_cl) + NL2 + NL2 +
+        '<b>BY PAIR:</b>' + NL2
+    )
+    for pair in sorted(set(t['pair'] for t in closed)):
+        pt   = [t for t in closed if t['pair'] == pair]
+        pw   = [t for t in pt if t['result'] != 'SL']
+        wr_p = round(len(pw) / len(pt) * 100, 1) if pt else 0
+        pp_p = round(sum(t['pips'] for t in pt), 1)
+        tg_summary += (pair.replace('_', '/').ljust(10) +
+                       ' T:' + str(len(pt)) +
+                       ' W:' + str(len(pw)) +
+                       ' WR:' + str(wr_p) + '%' +
+                       ' P&L:' + str(pp_p) + NL2)
+
+    tg_summary += NL2 + '<b>LAST 10 TRADES:</b>' + NL2
+    for t in all_trades[-10:]:
+        tg_summary += (
+            t['entry_time'][:10] + ' ' +
+            t['pair'].replace('_', '/') + ' ' +
+            t['direction'] + ' ' +
+            t['result'] + ' ' +
+            str(t['pips']) + 'p' + NL2
+        )
+
+    send_telegram(tg_summary)
+
     print(NL + SEP)
     print('  FXAlexG BACKTEST RESULTS - A+ Trades - 2 Years')
     print('  Entry on candle CLOSE only - No look-ahead bias')
