@@ -409,26 +409,50 @@ def calc_sl_tp(direction, price, aoi_zone, pair, all_aois, h1_candles):
 
 # ─── SIMULATE TRADE ON CANDLE CLOSES ONLY ───────────────────
 def simulate_trade(direction, entry, sl, tp1, tp2, future_candles):
-    tp1_hit = False
+    # Check candle closes only - no wicks
+    # TP1 hit = WIN immediately (close half, move SL to BE)
+    # If still running after TP1 and TP2 also hit = FULL WIN
+    tp1_hit    = False
+    tp1_time   = None
+    tp1_price  = None
+
     for c in future_candles:
-        close = c['close']  # Use CLOSE only - no look-ahead
+        close = c['close']  # Candle CLOSE only
+
         if direction == 'BUY':
-            if close <= sl:
-                return 'SL', c['time'], close, tp1_hit
+            # SL check - after TP1 hit, SL moved to breakeven (entry)
+            effective_sl = entry if tp1_hit else sl
+            if close <= effective_sl:
+                if tp1_hit:
+                    return 'TP1', tp1_time, tp1_price, True  # Stopped at BE after TP1
+                return 'SL', c['time'], close, False
+
             if not tp1_hit and close >= tp1:
-                tp1_hit = True  # Partial close at TP1, ride to TP2
+                tp1_hit   = True
+                tp1_time  = c['time']
+                tp1_price = tp1
+                # Continue riding to TP2
+
             if tp1_hit and close >= tp2:
-                return 'TP2', c['time'], close, tp1_hit
+                return 'TP2', c['time'], tp2, True
+
         else:  # SELL
-            if close >= sl:
-                return 'SL', c['time'], close, tp1_hit
+            effective_sl = entry if tp1_hit else sl
+            if close >= effective_sl:
+                if tp1_hit:
+                    return 'TP1', tp1_time, tp1_price, True  # Stopped at BE after TP1
+                return 'SL', c['time'], close, False
+
             if not tp1_hit and close <= tp1:
-                tp1_hit = True
+                tp1_hit   = True
+                tp1_time  = c['time']
+                tp1_price = tp1
+
             if tp1_hit and close <= tp2:
-                return 'TP2', c['time'], close, tp1_hit
-    # Check if TP1 hit but TP2 not reached by end of data
+                return 'TP2', c['time'], tp2, True
+
     if tp1_hit:
-        return 'TP1', future_candles[-1]['time'], tp1, True
+        return 'TP1', tp1_time, tp1_price, True
     return 'OPEN', None, entry, False
 
 # ─── BACKTEST ONE PAIR ───────────────────────────────────────
@@ -593,13 +617,18 @@ def backtest_pair(pair, h1_all, w_all, d_all, h4_all):
 # ─── PRINT RESULTS ───────────────────────────────────────────
 def print_results(all_trades):
     NL = chr(10)
-    print(NL + '=' * 65)
+    SEP = '=' * 80
+    print(NL + SEP)
     print('  FXAlexG BACKTEST RESULTS - A+ Trades - 2 Years')
     print('  Entry on candle CLOSE only - No look-ahead bias')
-    print('=' * 65)
+    print(SEP)
 
     if not all_trades:
-        print('No trades found.')
+        print('No A+ trades found in 2 years of data.')
+        print('Possible reasons:')
+        print('  - Score threshold too high (needs 8.0+)')
+        print('  - Strong AOI rarely found (5 touches + 4 reversals)')
+        print('  - All 4 TFs rarely align')
         return
 
     closed = [t for t in all_trades if t['result'] != 'OPEN']
@@ -613,10 +642,10 @@ def print_results(all_trades):
     tot_pip = round(sum(t['pips'] for t in closed), 1)
     avg_win = round(sum(t['pips'] for t in wins) / len(wins), 1) if wins else 0
     avg_sl  = round(sum(t['pips'] for t in sls)  / len(sls),  1) if sls  else 0
-    pf      = round(sum(t['pips'] for t in wins) / abs(sum(t['pips'] for t in sls)), 2) \
-              if sls and sum(t['pips'] for t in sls) != 0 else 0
+    gross_win  = sum(t['pips'] for t in wins)
+    gross_loss = abs(sum(t['pips'] for t in sls))
+    pf = round(gross_win / gross_loss, 2) if gross_loss > 0 else 0
 
-    # Max consecutive losses
     max_cl = cl = 0
     for t in closed:
         if t['result'] == 'SL':
@@ -625,47 +654,81 @@ def print_results(all_trades):
         else:
             cl = 0
 
-    print(NL + 'OVERALL:')
-    print('  A+ signals found:       ' + str(len(all_trades)))
-    print('  Closed trades:          ' + str(total))
-    print('  Still open (end data):  ' + str(len(all_trades) - total))
-    print('  TP2 (full target):      ' + str(len(tp2s)))
-    print('  TP1 (half target):      ' + str(len(tp1s)))
-    print('  SL (stopped out):       ' + str(len(sls)))
-    print('  Win Rate (TP1+TP2):     ' + str(wr) + '%')
-    print('  Avg Win (pips):         +' + str(avg_win))
-    print('  Avg Loss (pips):        ' + str(avg_sl))
-    print('  Total Pips:             ' + str(tot_pip))
-    print('  Profit Factor:          ' + str(pf))
-    print('  Max Consec. Losses:     ' + str(max_cl))
+    print(NL + 'OVERALL STATISTICS:')
+    print('  A+ signals found:        ' + str(len(all_trades)))
+    print('  Closed trades:           ' + str(total))
+    print('  Still open (end data):   ' + str(len(all_trades) - total))
+    print('  TP2 hit (full target):   ' + str(len(tp2s)))
+    print('  TP1 hit (half target):   ' + str(len(tp1s)))
+    print('  SL hit (stopped out):    ' + str(len(sls)))
+    print('  Win Rate (TP1 + TP2):    ' + str(wr) + '%')
+    print('  Avg Win  (pips):         +' + str(avg_win))
+    print('  Avg Loss (pips):         ' + str(avg_sl))
+    print('  Total Pips P&L:          ' + str(tot_pip))
+    print('  Profit Factor:           ' + str(pf))
+    print('  Max Consecutive Losses:  ' + str(max_cl))
 
     print(NL + 'BY PAIR:')
+    print('  ' + 'Pair'.ljust(10) + 'Trades  Wins    WR%    TP1  TP2   SL   Pips')
+    print('  ' + '-' * 60)
     for pair in sorted(set(t['pair'] for t in closed)):
-        pt = [t for t in closed if t['pair'] == pair]
-        pw = [t for t in pt if t['result'] != 'SL']
+        pt  = [t for t in closed if t['pair'] == pair]
+        pw  = [t for t in pt if t['result'] != 'SL']
+        pt1 = [t for t in pt if t['result'] == 'TP1']
+        pt2 = [t for t in pt if t['result'] == 'TP2']
+        psl = [t for t in pt if t['result'] == 'SL']
         wr_p = round(len(pw) / len(pt) * 100, 1) if pt else 0
         pp_p = round(sum(t['pips'] for t in pt), 1)
         print('  ' + pair.replace('_', '/').ljust(10) +
-              ' Trades:' + str(len(pt)).rjust(3) +
-              '  Wins:' + str(len(pw)).rjust(3) +
-              '  WR:' + str(wr_p).rjust(6) + '%' +
-              '  Pips:' + str(pp_p).rjust(8))
+              str(len(pt)).rjust(5) +
+              str(len(pw)).rjust(6) +
+              str(wr_p).rjust(8) + '%' +
+              str(len(pt1)).rjust(5) +
+              str(len(pt2)).rjust(5) +
+              str(len(psl)).rjust(5) +
+              str(pp_p).rjust(8))
 
-    print(NL + 'LAST 30 TRADES:')
-    print('  Date        Pair        Dir   Score  Pattern             Result  Pips')
-    print('  ' + '-' * 63)
-    for t in closed[-30:]:
+    print(NL + 'FULL TRADE LOG:')
+    print('  ' + '-' * 110)
+    print('  ' +
+          'Entry Date'.ljust(12) +
+          'Pair'.ljust(10) +
+          'Dir'.ljust(5) +
+          'Score'.ljust(6) +
+          'Entry'.ljust(10) +
+          'SL'.ljust(10) +
+          'TP1'.ljust(10) +
+          'TP2'.ljust(10) +
+          'Result'.ljust(8) +
+          'Exit Price'.ljust(12) +
+          'Pips'.ljust(8) +
+          'Pattern')
+    print('  ' + '-' * 110)
+    for t in all_trades:
         date    = t['entry_time'][:10]
-        pattern = t.get('pattern', 'N/A')[:18].ljust(18)
-        print('  ' + date + '  ' +
-              t['pair'].replace('_', '/').ljust(10) + '  ' +
-              t['direction'].ljust(5) + ' ' +
-              str(t['score']).ljust(5) + '  ' +
-              pattern + '  ' +
-              t['result'].ljust(6) + '  ' +
-              str(t['pips']))
+        result  = t['result']
+        ep      = str(round(t['entry'], 5))
+        sl_str  = str(round(t['sl'],    5))
+        tp1_str = str(round(t['tp1'],   5))
+        tp2_str = str(round(t['tp2'],   5))
+        xp      = str(round(t.get('exit_price', t['entry']), 5)) if t['exit_price'] else 'OPEN'
+        pips    = str(t['pips']) if result != 'OPEN' else '-'
+        pattern = t.get('pattern', 'N/A')[:20]
+        print('  ' +
+              date.ljust(12) +
+              t['pair'].replace('_', '/').ljust(10) +
+              t['direction'].ljust(5) +
+              str(t['score']).ljust(6) +
+              ep.ljust(10) +
+              sl_str.ljust(10) +
+              tp1_str.ljust(10) +
+              tp2_str.ljust(10) +
+              result.ljust(8) +
+              xp.ljust(12) +
+              pips.ljust(8) +
+              pattern)
 
-    print(NL + '=' * 65)
+    print(NL + SEP)
 
 # ─── MAIN ────────────────────────────────────────────────────
 def main():
