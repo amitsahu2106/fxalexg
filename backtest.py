@@ -633,70 +633,35 @@ def send_telegram(msg):
 
 # ─── PRINT RESULTS ───────────────────────────────────────────
 def print_results(all_trades):
-    NL = chr(10)
-    SEP = '=' * 80
-    # ── Send summary to Telegram ──────────────────────────────
+    NL  = chr(10)
     NL2 = chr(10)
-    tg_summary = (
-        '<b>FXAlexG Backtest Results - 2 Years</b>' + NL2 +
-        'TP1=1R, TP2=2R | Entry on candle close' + NL2 + NL2 +
-        '<b>OVERALL:</b>' + NL2 +
-        'A+ Signals: ' + str(len(all_trades)) + NL2 +
-        'Closed: ' + str(total) + NL2 +
-        'TP2 (2R wins): ' + str(len(tp2s)) + NL2 +
-        'TP1 (1R wins): ' + str(len(tp1s)) + NL2 +
-        'SL (losses):   ' + str(len(sls)) + NL2 +
-        'Win Rate: <b>' + str(wr) + '%</b>' + NL2 +
-        'Avg Win:  +' + str(avg_win) + ' pips' + NL2 +
-        'Avg Loss: ' + str(avg_sl) + ' pips' + NL2 +
-        'Total P&L: ' + str(tot_pip) + ' pips' + NL2 +
-        'Profit Factor: ' + str(pf) + NL2 +
-        'Max Consec. Losses: ' + str(max_cl) + NL2 + NL2 +
-        '<b>BY PAIR:</b>' + NL2
-    )
-    for pair in sorted(set(t['pair'] for t in closed)):
-        pt   = [t for t in closed if t['pair'] == pair]
-        pw   = [t for t in pt if t['result'] != 'SL']
-        wr_p = round(len(pw) / len(pt) * 100, 1) if pt else 0
-        pp_p = round(sum(t['pips'] for t in pt), 1)
-        tg_summary += (pair.replace('_', '/').ljust(10) +
-                       ' T:' + str(len(pt)) +
-                       ' W:' + str(len(pw)) +
-                       ' WR:' + str(wr_p) + '%' +
-                       ' P&L:' + str(pp_p) + NL2)
-
-    tg_summary += NL2 + '<b>LAST 10 TRADES:</b>' + NL2
-    for t in all_trades[-10:]:
-        tg_summary += (
-            t['entry_time'][:10] + ' ' +
-            t['pair'].replace('_', '/') + ' ' +
-            t['direction'] + ' ' +
-            t['result'] + ' ' +
-            str(t['pips']) + 'p' + NL2
-        )
-
-    send_telegram(tg_summary)
-
+    SEP = '=' * 80
     print(NL + SEP)
     print('  FXAlexG BACKTEST RESULTS - A+ Trades - 2 Years')
     print('  Entry on candle CLOSE only - No look-ahead bias')
+    print('  TP1 = 1R  |  TP2 = 2R')
     print(SEP)
 
     if not all_trades:
-        print('No A+ trades found in 2 years of data.')
-        print('Possible reasons:')
-        print('  - Score threshold too high (needs 8.0+)')
-        print('  - Strong AOI rarely found (5 touches + 4 reversals)')
-        print('  - All 4 TFs rarely align')
+        msg = 'No A+ trades found in 2 years.'
+        print(msg)
+        send_telegram('<b>FXAlexG Backtest</b>' + NL + msg)
         return
 
     closed = [t for t in all_trades if t['result'] != 'OPEN']
-    tp2s   = [t for t in closed if t['result'] == 'TP2']
-    tp1s   = [t for t in closed if t['result'] == 'TP1']
-    sls    = [t for t in closed if t['result'] == 'SL']
-    wins   = tp1s + tp2s
 
-    total   = len(closed)
+    if not closed:
+        msg = 'Signals found: ' + str(len(all_trades)) + ' but all still OPEN at end of data.'
+        print(msg)
+        send_telegram('<b>FXAlexG Backtest</b>' + NL + msg)
+        return
+
+    tp2s  = [t for t in closed if t['result'] == 'TP2']
+    tp1s  = [t for t in closed if t['result'] == 'TP1']
+    sls   = [t for t in closed if t['result'] == 'SL']
+    wins  = tp1s + tp2s
+    total = len(closed)
+
     wr      = round(len(wins) / total * 100, 1) if total else 0
     tot_pip = round(sum(t['pips'] for t in closed), 1)
     avg_win = round(sum(t['pips'] for t in wins) / len(wins), 1) if wins else 0
@@ -717,9 +682,9 @@ def print_results(all_trades):
     print('  A+ signals found:        ' + str(len(all_trades)))
     print('  Closed trades:           ' + str(total))
     print('  Still open (end data):   ' + str(len(all_trades) - total))
-    print('  TP2 hit (full target):   ' + str(len(tp2s)))
-    print('  TP1 hit (half target):   ' + str(len(tp1s)))
-    print('  SL hit (stopped out):    ' + str(len(sls)))
+    print('  TP2 hit (2R full win):   ' + str(len(tp2s)))
+    print('  TP1 hit (1R win):        ' + str(len(tp1s)))
+    print('  SL hit  (loss):          ' + str(len(sls)))
     print('  Win Rate (TP1 + TP2):    ' + str(wr) + '%')
     print('  Avg Win  (pips):         +' + str(avg_win))
     print('  Avg Loss (pips):         ' + str(avg_sl))
@@ -731,11 +696,11 @@ def print_results(all_trades):
     print('  ' + 'Pair'.ljust(10) + 'Trades  Wins    WR%    TP1  TP2   SL   Pips')
     print('  ' + '-' * 60)
     for pair in sorted(set(t['pair'] for t in closed)):
-        pt  = [t for t in closed if t['pair'] == pair]
-        pw  = [t for t in pt if t['result'] != 'SL']
-        pt1 = [t for t in pt if t['result'] == 'TP1']
-        pt2 = [t for t in pt if t['result'] == 'TP2']
-        psl = [t for t in pt if t['result'] == 'SL']
+        pt   = [t for t in closed if t['pair'] == pair]
+        pw   = [t for t in pt if t['result'] != 'SL']
+        pt1  = [t for t in pt if t['result'] == 'TP1']
+        pt2  = [t for t in pt if t['result'] == 'TP2']
+        psl  = [t for t in pt if t['result'] == 'SL']
         wr_p = round(len(pw) / len(pt) * 100, 1) if pt else 0
         pp_p = round(sum(t['pips'] for t in pt), 1)
         print('  ' + pair.replace('_', '/').ljust(10) +
@@ -767,10 +732,10 @@ def print_results(all_trades):
         date    = t['entry_time'][:10]
         result  = t['result']
         ep      = str(round(t['entry'], 5))
-        sl_str  = str(round(t['sl'],    5))
-        tp1_str = str(round(t['tp1'],   5))
-        tp2_str = str(round(t['tp2'],   5))
-        xp      = str(round(t.get('exit_price', t['entry']), 5)) if t['exit_price'] else 'OPEN'
+        sl_s    = str(round(t['sl'],    5))
+        tp1_s   = str(round(t['tp1'],   5))
+        tp2_s   = str(round(t['tp2'],   5))
+        xp      = str(round(t.get('exit_price', t['entry']), 5)) if t.get('exit_price') else 'OPEN'
         pips    = str(t['pips']) if result != 'OPEN' else '-'
         pattern = t.get('pattern', 'N/A')[:20]
         print('  ' +
@@ -779,15 +744,55 @@ def print_results(all_trades):
               t['direction'].ljust(5) +
               str(t['score']).ljust(6) +
               ep.ljust(10) +
-              sl_str.ljust(10) +
-              tp1_str.ljust(10) +
-              tp2_str.ljust(10) +
+              sl_s.ljust(10) +
+              tp1_s.ljust(10) +
+              tp2_s.ljust(10) +
               result.ljust(8) +
               xp.ljust(12) +
               pips.ljust(8) +
               pattern)
 
     print(NL + SEP)
+
+    # ── Send Telegram AFTER all variables are computed ────────
+    tg = (
+        '<b>FXAlexG Backtest - 2 Years</b>' + NL2 +
+        'TP1=1R, TP2=2R | Candle close only' + NL2 + NL2 +
+        '<b>OVERALL:</b>' + NL2 +
+        'A+ Signals: '    + str(len(all_trades)) + NL2 +
+        'Closed: '        + str(total)           + NL2 +
+        'TP2 (2R): '      + str(len(tp2s))       + NL2 +
+        'TP1 (1R): '      + str(len(tp1s))       + NL2 +
+        'SL:       '      + str(len(sls))         + NL2 +
+        'Win Rate: <b>'   + str(wr) + '%</b>'    + NL2 +
+        'Avg Win:  +'     + str(avg_win) + 'p'   + NL2 +
+        'Avg Loss: '      + str(avg_sl)  + 'p'   + NL2 +
+        'Total P&L: '     + str(tot_pip) + 'p'   + NL2 +
+        'Profit Factor: ' + str(pf)              + NL2 +
+        'Max Consec SL: ' + str(max_cl)          + NL2 + NL2 +
+        '<b>BY PAIR:</b>' + NL2
+    )
+    for pair in sorted(set(t['pair'] for t in closed)):
+        pt   = [t for t in closed if t['pair'] == pair]
+        pw   = [t for t in pt if t['result'] != 'SL']
+        wr_p = round(len(pw) / len(pt) * 100, 1) if pt else 0
+        pp_p = round(sum(t['pips'] for t in pt), 1)
+        tg  += (pair.replace('_', '/').ljust(10) +
+                ' T:' + str(len(pt)) +
+                ' W:' + str(len(pw)) +
+                ' WR:' + str(wr_p) + '%' +
+                ' P&L:' + str(pp_p) + 'p' + NL2)
+
+    tg += NL2 + '<b>LAST 10 TRADES:</b>' + NL2
+    for t in all_trades[-10:]:
+        tg += (t['entry_time'][:10] + ' ' +
+               t['pair'].replace('_', '/') + ' ' +
+               t['direction'] + ' ' +
+               t['result'] + ' ' +
+               str(t['pips']) + 'p' + NL2)
+
+    send_telegram(tg)
+
 
 # ─── MAIN ────────────────────────────────────────────────────
 def main():
