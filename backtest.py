@@ -783,15 +783,37 @@ def print_results(all_trades):
                 ' WR:' + str(wr_p) + '%' +
                 ' P&L:' + str(pp_p) + 'p' + NL2)
 
-    tg += NL2 + '<b>LAST 10 TRADES:</b>' + NL2
-    for t in all_trades[-10:]:
-        tg += (t['entry_time'][:10] + ' ' +
-               t['pair'].replace('_', '/') + ' ' +
-               t['direction'] + ' ' +
-               t['result'] + ' ' +
-               str(t['pips']) + 'p' + NL2)
-
+    # ── Send summary first (Telegram 4096 char limit per message) ──
     send_telegram(tg)
+
+    # ── Send all trades in chunks of 30 ──────────────────────────
+    chunk_size = 30
+    for chunk_start in range(0, len(all_trades), chunk_size):
+        chunk = all_trades[chunk_start:chunk_start + chunk_size]
+        chunk_num = (chunk_start // chunk_size) + 1
+        total_chunks = (len(all_trades) + chunk_size - 1) // chunk_size
+        trades_msg = (
+            '<b>All Trades ' +
+            str(chunk_start + 1) + '-' +
+            str(min(chunk_start + chunk_size, len(all_trades))) +
+            ' of ' + str(len(all_trades)) +
+            ' (Part ' + str(chunk_num) + '/' + str(total_chunks) + ')</b>' + NL2 +
+            'Date        Pair      Dir  Entry      SL         TP1        TP2        Result  Pips' + NL2 +
+            '-' * 90 + NL2
+        )
+        for t in chunk:
+            trades_msg += (
+                t['entry_time'][:10] + '  ' +
+                t['pair'].replace('_', '/').ljust(8) + '  ' +
+                t['direction'].ljust(4) + ' ' +
+                str(round(t['entry'], 5)).ljust(10) + ' ' +
+                str(round(t['sl'],    5)).ljust(10) + ' ' +
+                str(round(t['tp1'],   5)).ljust(10) + ' ' +
+                str(round(t['tp2'],   5)).ljust(10) + ' ' +
+                t['result'].ljust(6) + '  ' +
+                str(t['pips']) + 'p' + NL2
+            )
+        send_telegram(trades_msg)
 
 
 # ─── MAIN ────────────────────────────────────────────────────
