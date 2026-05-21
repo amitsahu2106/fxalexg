@@ -66,7 +66,7 @@ def fetch_chunk(pair, granularity, from_dt):
 def fetch_2years(pair, granularity):
     # Paginate from 2 years ago to now using from+count
     now   = datetime.now(timezone.utc)
-    start = now - timedelta(days=730)
+    start = datetime(2024, 1, 1, tzinfo=timezone.utc)  # Backtest from Jan 2024
     all_c = []
     cursor = start
 
@@ -371,33 +371,55 @@ def calc_atr(candles, period=14):
 # TP1 = entry + risk * 1  (1:1 RR)
 # TP2 = entry + risk * 2  (2:1 RR)
 def calc_sl_tp(direction, price, aoi_zone, pair, all_aois, h1_candles):
+    # TP1 = 1R (entry + risk)
+    # TP2 = midpoint of next AOI above TP1 (BUY)
+    #        midpoint of next AOI below TP1 (SELL)
+    # Fallback TP2 = 2R if no AOI found
     atr     = calc_atr(h1_candles)
     atr_buf = atr * 1.5 if atr else from_pips(10, pair)
 
     if direction == 'BUY' and aoi_zone:
         sl   = round(aoi_zone['bottom'] - atr_buf, 5)
         risk = abs(price - sl)
-        tp1  = round(price + risk * 1.0, 5)   # TP1 = 1R
-        tp2  = round(price + risk * 2.0, 5)   # TP2 = 2R
+        tp1  = round(price + risk, 5)          # TP1 = 1R
+
+        # TP2 = midpoint of next AOI above TP1
+        higher_aois = sorted(
+            [z for z in all_aois if z['bottom'] > tp1],
+            key=lambda z: z['bottom']
+        )
+        if higher_aois:
+            tp2 = round(higher_aois[0]['mid'], 5)
+        else:
+            tp2 = round(price + risk * 2.0, 5)  # Fallback 2R
 
     elif direction == 'SELL' and aoi_zone:
         sl   = round(aoi_zone['top'] + atr_buf, 5)
         risk = abs(sl - price)
-        tp1  = round(price - risk * 1.0, 5)   # TP1 = 1R
-        tp2  = round(price - risk * 2.0, 5)   # TP2 = 2R
+        tp1  = round(price - risk, 5)          # TP1 = 1R
+
+        # TP2 = midpoint of next AOI below TP1
+        lower_aois = sorted(
+            [z for z in all_aois if z['top'] < tp1],
+            key=lambda z: z['top'], reverse=True
+        )
+        if lower_aois:
+            tp2 = round(lower_aois[0]['mid'], 5)
+        else:
+            tp2 = round(price - risk * 2.0, 5)  # Fallback 2R
 
     else:
         atr_buf = atr * 1.5 if atr else from_pips(15, pair)
         if direction == 'SELL':
-            sl  = round(price + atr_buf, 5)
+            sl   = round(price + atr_buf, 5)
             risk = abs(sl - price)
-            tp1 = round(price - risk * 1.0, 5)
-            tp2 = round(price - risk * 2.0, 5)
+            tp1  = round(price - risk, 5)
+            tp2  = round(price - risk * 2.0, 5)
         else:
-            sl  = round(price - atr_buf, 5)
+            sl   = round(price - atr_buf, 5)
             risk = abs(price - sl)
-            tp1 = round(price + risk * 1.0, 5)
-            tp2 = round(price + risk * 2.0, 5)
+            tp1  = round(price + risk, 5)
+            tp2  = round(price + risk * 2.0, 5)
 
     return sl, tp1, tp2
 
