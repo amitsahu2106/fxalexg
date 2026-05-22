@@ -1,16 +1,4 @@
 {
-  "USD_CAD": {
-    "pair": "USD_CAD",
-    "direction": "BUY",
-    "entry": 1.37469,
-    "sl": 1.37238,
-    "tp1": 1.37931,
-    "tp2": 1.38162,
-    "tp1_hit": true,
-    "aoi_top": 1.3779,
-    "aoi_bottom": 1.37357,
-    "opened_at": "2026-05-19 04:27 UTC"
-  },
   "EUR_USD": {
     "pair": "EUR_USD",
     "direction": "SELL",
