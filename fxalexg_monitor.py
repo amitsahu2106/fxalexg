@@ -801,7 +801,7 @@ def save_trades(trades):
     except Exception as e:
         print('  Error saving trades: ' + str(e))
 
-def add_trade(pair, direction, entry, sl, tp1, tp2, aoi_zone):
+def add_trade(pair, direction, entry, sl, tp1, tp2, tp3, aoi_zone):
     trades = load_trades()
     # 1 trade per pair - skip if pair already being tracked
     if pair in trades:
@@ -814,7 +814,9 @@ def add_trade(pair, direction, entry, sl, tp1, tp2, aoi_zone):
         'sl':        sl,
         'tp1':       tp1,
         'tp2':       tp2,
+        'tp3':       tp3,
         'tp1_hit':   False,
+        'tp2_hit':   False,
         'aoi_top':   aoi_zone['top']    if aoi_zone else None,
         'aoi_bottom':aoi_zone['bottom'] if aoi_zone else None,
         'opened_at': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'),
@@ -845,88 +847,65 @@ def calc_atr(candles, period=14):
     return sum(trs[-period:]) / period
 
 def calc_sl_tp(direction, price, aoi_zone, pair, all_aois, candles=None):
-    # BUY:
-    #   SL  = lower edge of current AOI - (1.5 * ATR)
-    #   TP1 = entry + (risk * 2) minimum, must land inside an AOI above
-    #   TP2 = lower edge of the NEXT AOI above TP1
-    # SELL:
-    #   SL  = upper edge of current AOI + (1.5 * ATR)
-    #   TP1 = entry - (risk * 2) minimum, must land inside an AOI below
-    #   TP2 = upper edge of the NEXT AOI below TP1
-    atr = calc_atr(candles) if candles else None
+    # TP1 = 1R (entry +/- risk)
+    # TP2 = mid of first AOI beyond TP1 (was old TP1)
+    # TP3 = bottom/top of that same AOI (was old TP2)
+    # SL  = AOI edge - 1.5 x ATR
+    atr     = calc_atr(candles) if candles else None
     atr_buf = atr * 1.5 if atr else from_pips(10, pair)
 
     if direction == 'BUY' and aoi_zone:
         sl   = round(aoi_zone['bottom'] - atr_buf, 5)
         risk = abs(price - sl)
-        min_tp1 = price + risk * 2.0  # Minimum 2R
+        tp1  = round(price + risk, 5)              # TP1 = 1R
 
-        # Find AOIs above current price sorted by proximity
+        # TP2 = mid of first AOI above TP1
+        # TP3 = top of that same AOI
         higher_aois = sorted(
-            [z for z in all_aois if z['bottom'] > aoi_zone['top']],
+            [z for z in all_aois if z['bottom'] > tp1],
             key=lambda z: z['bottom']
         )
-
-        tp1 = None
-        tp2 = None
-        for idx, z in enumerate(higher_aois):
-            # TP1 must be at or above the bottom of this AOI with at least 2R
-            if z['top'] >= min_tp1:
-                # Use the greater of min_tp1 or zone bottom
-                tp1 = round(max(min_tp1, z['bottom']), 5)
-                # TP2 = bottom of NEXT AOI above TP1 zone
-                if idx + 1 < len(higher_aois):
-                    tp2 = round(higher_aois[idx + 1]['bottom'], 5)
-                else:
-                    tp2 = round(z['top'] + from_pips(5, pair), 5)
-                break
-
-        if tp1 is None:
-            tp1 = round(price + risk * 2.0, 5)
-            tp2 = round(price + risk * 3.0, 5)
+        if higher_aois:
+            tp2 = round(higher_aois[0]['mid'], 5)
+            tp3 = round(higher_aois[0]['top'], 5)
+        else:
+            tp2 = round(price + risk * 2.0, 5)
+            tp3 = round(price + risk * 3.0, 5)
 
     elif direction == 'SELL' and aoi_zone:
         sl   = round(aoi_zone['top'] + atr_buf, 5)
         risk = abs(sl - price)
-        min_tp1 = price - risk * 2.0  # Minimum 2R
+        tp1  = round(price - risk, 5)              # TP1 = 1R
 
-        # Find AOIs below current price sorted by proximity (nearest first)
+        # TP2 = mid of first AOI below TP1
+        # TP3 = bottom of that same AOI
         lower_aois = sorted(
-            [z for z in all_aois if z['top'] < aoi_zone['bottom']],
+            [z for z in all_aois if z['top'] < tp1],
             key=lambda z: z['top'], reverse=True
         )
-
-        tp1 = None
-        tp2 = None
-        for idx, z in enumerate(lower_aois):
-            # TP1 must be at or below the top of this AOI with at least 2R
-            if z['bottom'] <= min_tp1:
-                tp1 = round(min(min_tp1, z['top']), 5)
-                # TP2 = top of NEXT AOI below TP1 zone
-                if idx + 1 < len(lower_aois):
-                    tp2 = round(lower_aois[idx + 1]['top'], 5)
-                else:
-                    tp2 = round(z['bottom'] - from_pips(5, pair), 5)
-                break
-
-        if tp1 is None:
-            tp1 = round(price - risk * 2.0, 5)
-            tp2 = round(price - risk * 3.0, 5)
+        if lower_aois:
+            tp2 = round(lower_aois[0]['mid'], 5)
+            tp3 = round(lower_aois[0]['bottom'], 5)
+        else:
+            tp2 = round(price - risk * 2.0, 5)
+            tp3 = round(price - risk * 3.0, 5)
 
     else:
         atr_buf = atr * 1.5 if atr else from_pips(15, pair)
         if direction == 'SELL':
             sl  = round(price + atr_buf, 5)
             risk = abs(sl - price)
-            tp1 = round(price - risk * 2.0, 5)
-            tp2 = round(price - risk * 3.0, 5)
+            tp1 = round(price - risk, 5)
+            tp2 = round(price - risk * 2.0, 5)
+            tp3 = round(price - risk * 3.0, 5)
         else:
             sl  = round(price - atr_buf, 5)
             risk = abs(price - sl)
-            tp1 = round(price + risk * 2.0, 5)
-            tp2 = round(price + risk * 3.0, 5)
+            tp1 = round(price + risk, 5)
+            tp2 = round(price + risk * 2.0, 5)
+            tp3 = round(price + risk * 3.0, 5)
 
-    return sl, tp1, tp2
+    return sl, tp1, tp2, tp3
 
 def check_active_trades():
     trades = load_trades()
@@ -934,12 +913,9 @@ def check_active_trades():
         print('  No active trades.')
         return
     print('  Checking ' + str(len(trades)) + ' active trade(s)...')
-    NL  = chr(10)
-    # Reload after each save to keep dict in sync
-    trades = load_trades()
+    NL = chr(10)
 
     for pair in list(trades.keys()):
-        # Reload each iteration so saves don't corrupt loop
         trades = load_trades()
         if pair not in trades:
             continue
@@ -956,7 +932,9 @@ def check_active_trades():
         sl        = trade['sl']
         tp1       = trade['tp1']
         tp2       = trade['tp2']
+        tp3       = trade.get('tp3', trade['tp2'])
         tp1_hit   = trade.get('tp1_hit', False)
+        tp2_hit_f = trade.get('tp2_hit', False)
 
         if direction == 'BUY':
             pips = calc_pips(price - entry, pair)
@@ -965,48 +943,73 @@ def check_active_trades():
 
         sign     = '+' if pips >= 0 else ''
         pips_str = sign + str(pips) + ' pips'
+        risk     = abs(entry - sl)
+        rr       = round(abs(price - entry) / risk, 2) if risk > 0 else 0
+        rr_str   = ('+' if pips >= 0 else '-') + str(rr) + 'R'
 
-        # Calculate RR achieved
-        risk = abs(entry - sl)
-        rr   = round(abs(price - entry) / risk, 2) if risk > 0 else 0
-        rr_str = ('+' if pips >= 0 else '-') + str(rr) + 'R'
+        # After TP1 hit, SL moves to breakeven
+        effective_sl = entry if tp1_hit else sl
 
-        sl_hit        = ((direction == 'BUY'  and price <= sl) or
-                         (direction == 'SELL' and price >= sl))
-        tp1_newly_hit = ((not tp1_hit) and
-                         ((direction == 'BUY'  and price >= tp1) or
-                          (direction == 'SELL' and price <= tp1)))
-        tp2_hit       = ((direction == 'BUY'  and price >= tp2) or
-                         (direction == 'SELL' and price <= tp2))
+        sl_hit         = ((direction == 'BUY'  and price <= effective_sl) or
+                          (direction == 'SELL' and price >= effective_sl))
+        tp1_newly_hit  = ((not tp1_hit) and
+                          ((direction == 'BUY'  and price >= tp1) or
+                           (direction == 'SELL' and price <= tp1)))
+        tp2_newly_hit  = ((tp1_hit and not tp2_hit_f) and
+                          ((direction == 'BUY'  and price >= tp2) or
+                           (direction == 'SELL' and price <= tp2)))
+        tp3_hit        = ((direction == 'BUY'  and price >= tp3) or
+                          (direction == 'SELL' and price <= tp3))
 
-        if sl_hit:
+        if tp3_hit:
             msg = (
-                'SL HIT ' + NL +
+                'TP3 HIT - MAXIMUM TARGET ' + NL +
                 pair.replace('_', '/') + ' ' + direction + NL +
                 'Entry: ' + str(entry) + NL +
-                'SL: ' + str(price) + NL +
-                'Loss: ' + pips_str + ' (' + rr_str + ')' + NL +
-                'Trade closed and removed from tracker.'
-            )
-            send_telegram(msg)
-            remove_trade(pair)
-            print('  SL hit - removed: ' + pair)
-
-        elif tp2_hit:
-            msg = (
-                'TP2 HIT - FULL TARGET ' + NL +
-                pair.replace('_', '/') + ' ' + direction + NL +
-                'Entry: ' + str(entry) + NL +
-                'TP2: ' + str(price) + NL +
+                'TP3: ' + str(tp3) + NL +
                 'Profit: ' + pips_str + ' (' + rr_str + ')' + NL +
-                'Trade closed. Well done!'
+                'Trade fully closed. Excellent!'
             )
             send_telegram(msg)
             remove_trade(pair)
-            print('  TP2 hit - removed: ' + pair)
+            print('  TP3 hit - removed: ' + pair)
+
+        elif sl_hit:
+            if tp1_hit:
+                msg = (
+                    'STOPPED AT BREAKEVEN ' + NL +
+                    pair.replace('_', '/') + ' ' + direction + NL +
+                    'TP1 was hit. Closed at entry (0 loss).' + NL +
+                    'TP1 profit secured. Trade closed.'
+                )
+            else:
+                msg = (
+                    'SL HIT ' + NL +
+                    pair.replace('_', '/') + ' ' + direction + NL +
+                    'Entry: ' + str(entry) + NL +
+                    'SL: ' + str(price) + NL +
+                    'Loss: ' + pips_str + ' (' + rr_str + ')'
+                )
+            send_telegram(msg)
+            remove_trade(pair)
+            print('  SL/BE hit - removed: ' + pair)
+
+        elif tp2_newly_hit:
+            trades = load_trades()
+            trades[pair]['tp2_hit'] = True
+            save_trades(trades)
+            msg = (
+                'TP2 HIT ' + NL +
+                pair.replace('_', '/') + ' ' + direction + NL +
+                'Entry: ' + str(entry) + NL +
+                'TP2: ' + str(tp2) + NL +
+                'Profit: ' + pips_str + ' (' + rr_str + ')' + NL +
+                'Watching for TP3: ' + str(tp3)
+            )
+            send_telegram(msg)
+            print('  TP2 hit - watching TP3: ' + pair)
 
         elif tp1_newly_hit:
-            # Mark TP1 hit but keep trade open for TP2
             trades = load_trades()
             trades[pair]['tp1_hit'] = True
             save_trades(trades)
@@ -1014,25 +1017,30 @@ def check_active_trades():
                 'TP1 HIT ' + NL +
                 pair.replace('_', '/') + ' ' + direction + NL +
                 'Entry: ' + str(entry) + NL +
-                'TP1: ' + str(price) + NL +
+                'TP1: ' + str(tp1) + NL +
                 'Profit: ' + pips_str + ' (' + rr_str + ')' + NL +
-                'Move SL to breakeven. Watching TP2: ' + str(tp2)
+                'SL moved to breakeven. Watching TP2: ' + str(tp2)
             )
             send_telegram(msg)
-            print('  TP1 hit - keeping open for TP2: ' + pair)
+            print('  TP1 hit - SL to BE, watching TP2: ' + pair)
 
         else:
-            # Regular hourly update - no Gemini needed
             icon = '' if pips >= 0 else ''
+            if tp2_hit_f:
+                status = 'TP1+TP2 hit - watching TP3: ' + str(tp3)
+            elif tp1_hit:
+                status = 'TP1 hit - SL at BE - watching TP2: ' + str(tp2)
+            else:
+                status = 'Watching TP1: ' + str(tp1)
             msg = (
                 icon + ' Trade Update' + NL +
                 pair.replace('_', '/') + ' ' + direction + NL +
                 'Entry:   ' + str(entry) + NL +
                 'Current: ' + str(price) + NL +
                 'P&L:     ' + pips_str + ' (' + rr_str + ')' + NL +
-                'TP1: ' + str(tp1) + ' | TP2: ' + str(tp2) + NL +
-                'SL:  ' + str(sl) + NL +
-                ('TP1 already hit - riding to TP2' if tp1_hit else 'Watching for TP1')
+                'TP1: ' + str(tp1) + ' | TP2: ' + str(tp2) + ' | TP3: ' + str(tp3) + NL +
+                'SL: ' + str(effective_sl) + NL +
+                status
             )
             send_telegram(msg)
             print('  Update sent: ' + pair + ' ' + pips_str)
@@ -1090,11 +1098,11 @@ def analyse_fxalexg(pair):
             m15_candles = candles
 
     if not trends:
-        return
+        return None
 
     # Use last H1 candle close - already fetched, no extra API call
     if not h1_candles:
-        return
+        return None
     price = h1_candles[-1]['close']
 
     # Determine trade direction from majority trend
@@ -1107,7 +1115,7 @@ def analyse_fxalexg(pair):
     majority_count = max(bullish_count, bearish_count)
     if majority_count < 3:
         print('     Skipped - less than 3 TFs aligned (need 3 minimum)')
-        return
+        return None
 
     # Filter H&S pattern - must match majority direction
     # Bearish majority = only accept H&S (bearish)
@@ -1149,16 +1157,23 @@ def analyse_fxalexg(pair):
     print("     Grade: " + grade + " | Score: " + str(pts) + " | Trends: " + str(trends))
 
     if grade not in MIN_GRADE_TO_ALERT:
-        return
+        return {'pair': pair, 'grade': grade, 'pts': pts,
+                'direction': direction, 'trends': trends}
 
-    # Block new alert if this pair already has an active trade
+    # Block new alert if pair has active trade that has NOT yet hit TP1
+    # After TP1 is hit, new signals are allowed (trade rides to TP3)
     active_trades = load_trades()
     if pair in active_trades:
-        print('     Skipped - active trade already open for ' + pair)
-        return
+        tp1_already_hit = active_trades[pair].get('tp1_hit', False)
+        if not tp1_already_hit:
+            print('     Skipped - active trade open (TP1 not yet hit) for ' + pair)
+            return {'pair': pair, 'grade': grade, 'pts': pts,
+                    'direction': direction, 'trends': trends}
+        else:
+            print('     TP1 already hit for ' + pair + ' - new signal allowed')
 
     # Calculate SL and TP using AOI-based method
-    sl, tp1, tp2 = calc_sl_tp(direction, price, aoi_zone, pair, all_aois, h1_candles)
+    sl, tp1, tp2, tp3 = calc_sl_tp(direction, price, aoi_zone, pair, all_aois, h1_candles)
 
     data = {
         'price':        price,
@@ -1209,9 +1224,10 @@ def analyse_fxalexg(pair):
         "Direction: " + direction + "\n"
         "Time: " + datetime.now(timezone.utc).strftime('%H:%M UTC') + "\n"
         + es_line +
-        "\nSL: <code>" + str(sl) + "</code> (above AOI, risk " + str(risk_pips) + " pips)\n"
-        "TP1: <code>" + str(tp1) + "</code> (next AOI)\n"
-        "TP2: <code>" + str(tp2) + "</code> (next AOI far edge)\n"
+        "\nSL:  <code>" + str(sl) + "</code> (risk " + str(risk_pips) + " pips)\n"
+        "TP1: <code>" + str(tp1) + "</code> (1R)\n"
+        "TP2: <code>" + str(tp2) + "</code> (mid next AOI)\n"
+        "TP3: <code>" + str(tp3) + "</code> (edge next AOI)\n"
         "\n<b>Confluences:</b>\n" + reasons_txt + "\n"
         "<b>Analysis:</b>\n" + analysis
     )
@@ -1219,10 +1235,12 @@ def analyse_fxalexg(pair):
 
     # Add to trade tracker only for A+ grades
     if grade == 'A+':
-        add_trade(pair, direction, price, sl, tp1, tp2, aoi_zone)
+        add_trade(pair, direction, price, sl, tp1, tp2, tp3, aoi_zone)
         print("     Trade added to tracker")
 
     print("     Alert sent [" + grade + "]")
+    return {'pair': pair, 'grade': grade, 'pts': pts,
+            'direction': direction, 'trends': trends}
 
 # ─────────────────────────────────────────────
 # STRATEGY 2 - ICT KILLZONE ANALYSER (XAU/USD)
@@ -1351,12 +1369,34 @@ def main():
         print("  ERROR checking trades: " + str(e))
 
     print("\n--- Strategy 1: FXAlexG (All 9 Pairs) ---")
+    scorecard = []
     for pair in PAIRS:
         try:
-            analyse_fxalexg(pair)
+            result = analyse_fxalexg(pair)
+            if result:
+                scorecard.append(result)
             time.sleep(1)
         except Exception as e:
             print("  ERROR " + pair + ": " + str(e))
+
+    # Send single scorecard message to Telegram
+    if scorecard:
+        NL  = chr(10)
+        now = datetime.now(timezone.utc).strftime('%H:%M UTC')
+        sc_msg = '<b>Market Scorecard ' + now + '</b>' + NL
+        sc_msg += '(Needs 8.0+ for A+ alert)' + NL + NL
+        for r in sorted(scorecard, key=lambda x: x['pts'], reverse=True):
+            grade = r['grade']
+            pts   = r['pts']
+            pair  = r['pair']
+            dir_  = r.get('direction', 'N/A') or 'NEUTRAL'
+            emoji = '' if grade == 'A+' else '' if grade == 'B+' else ''
+            sc_msg += (emoji + ' ' + pair.replace('_', '/').ljust(9) +
+                       ' ' + dir_.ljust(7) +
+                       ' [' + grade + '] ' +
+                       str(pts) + '/10' + NL)
+        send_telegram(sc_msg)
+        print('  Scorecard sent for ' + str(len(scorecard)) + ' pairs')
 
     print("\n--- Strategy 2: ICT Killzone (XAU/USD) ---")
     try:
