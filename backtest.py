@@ -20,8 +20,8 @@ TELEGRAM_CHAT_ID   = os.environ.get('TELEGRAM_CHAT_ID', '')
 
 PAIRS = [
     'EUR_USD', 'GBP_USD', 'USD_JPY', 'AUD_USD',
-    'USD_CHF', 'NZD_USD', 'USD_CAD', 'XAU_USD', 'BTC_USD'
-]
+    'USD_CHF', 'NZD_USD', 'USD_CAD', 'XAU_USD'
+]  # BTC removed - too volatile for weekly engulfing
 
 # ─── PIP HELPERS ─────────────────────────────────────────────
 def pip_size(pair):
@@ -35,6 +35,15 @@ def to_pips(diff, pair):
 
 def from_pips(pips, pair):
     return pips * pip_size(pair)
+
+def ema(values, period):
+    if len(values) < period:
+        return None
+    m   = 2 / (period + 1)
+    val = sum(values[:period]) / period
+    for p in values[period:]:
+        val = (p - val) * m + val
+    return val
 
 # ─── FETCH DATA ──────────────────────────────────────────────
 def fetch_chunk(pair, granularity, from_dt):
@@ -98,37 +107,80 @@ def body_low(c):  return min(c['open'], c['close'])
 
 # ─── WEEKLY ENGULFING DETECTION ─────────────────────────────
 def is_bullish_weekly_engulfing(curr, prev):
-    # Curr week swept prev week low AND closed above prev week high
-    # This is a bullish outside bar showing reversal
-    return (curr['low']   < prev['low'] and
+    # Strict bullish outside bar:
+    # 1. Swept prev week low (took sellside liquidity)
+    # 2. Closed above prev week high (broke buyside)
+    # 3. Green candle (close > open)
+    # 4. STRONG close - in upper 30% of candle range (shows commitment)
+    # 5. Body size at least 50% of range (no doji-like indecision)
+    rng = curr['high'] - curr['low']
+    if rng <= 0:
+        return False
+    body = abs(curr['close'] - curr['open'])
+    close_position = (curr['close'] - curr['low']) / rng
+
+    return (curr['low']   < prev['low']  and
             curr['close'] > prev['high'] and
-            curr['close'] > curr['open'])
+            curr['close'] > curr['open'] and
+            close_position >= 0.70       and  # Close in upper 30%
+            body >= rng * 0.5)               # Strong body
 
 def is_bearish_weekly_engulfing(curr, prev):
-    # Curr week swept prev week high AND closed below prev week low
+    # Strict bearish outside bar (mirror)
+    rng = curr['high'] - curr['low']
+    if rng <= 0:
+        return False
+    body = abs(curr['close'] - curr['open'])
+    close_position = (curr['close'] - curr['low']) / rng
+
     return (curr['high']  > prev['high'] and
-            curr['close'] < prev['low'] and
-            curr['close'] < curr['open'])
+            curr['close'] < prev['low']  and
+            curr['close'] < curr['open'] and
+            close_position <= 0.30       and  # Close in lower 30%
+            body >= rng * 0.5)               # Strong body
 
 # ─── H1 ENGULFING ENTRY SIGNAL ──────────────────────────────
 def h1_bullish_engulfing(prev, curr):
-    # Standard bullish engulfing: prev red, curr green, curr body engulfs prev body
+    # Strict bullish engulfing on H1:
+    # 1. Prev candle red
+    # 2. Curr candle green
+    # 3. Curr body fully engulfs prev body
+    # 4. Curr body must be at least 1.2x prev body (strong reversal)
+    # 5. Curr close in upper 60% of its own range
     ph = max(prev['open'], prev['close'])
     pl = min(prev['open'], prev['close'])
     ch = max(curr['open'], curr['close'])
     cl = min(curr['open'], curr['close'])
+    pb = abs(prev['close'] - prev['open'])
+    cb = abs(curr['close'] - curr['open'])
+    rng = curr['high'] - curr['low']
+    if rng <= 0:
+        return False
+    close_pos = (curr['close'] - curr['low']) / rng
+
     return (prev['close'] < prev['open'] and
             curr['close'] > curr['open'] and
-            ch >= ph and cl <= pl)
+            ch >= ph and cl <= pl         and
+            cb >= pb * 1.2                and  # Strong reversal body
+            close_pos >= 0.60)                # Close strong
 
 def h1_bearish_engulfing(prev, curr):
     ph = max(prev['open'], prev['close'])
     pl = min(prev['open'], prev['close'])
     ch = max(curr['open'], curr['close'])
     cl = min(curr['open'], curr['close'])
+    pb = abs(prev['close'] - prev['open'])
+    cb = abs(curr['close'] - curr['open'])
+    rng = curr['high'] - curr['low']
+    if rng <= 0:
+        return False
+    close_pos = (curr['close'] - curr['low']) / rng
+
     return (prev['close'] > prev['open'] and
             curr['close'] < curr['open'] and
-            ch >= ph and cl <= pl)
+            ch >= ph and cl <= pl         and
+            cb >= pb * 1.2                and
+            close_pos <= 0.40)
 
 # ─── GET WEEK START FROM TIMESTAMP ──────────────────────────
 def get_week_start(time_str):
@@ -247,40 +299,76 @@ def backtest_pair(pair, h1_all, w_all):
             if open_trade or i <= exit_bar:
                 continue
 
-            # Direction filter: only take longs if BUY bias, shorts if SELL bias
-            # Entry rule: H1 engulfing in correct direction
+            # Risk/reward sanity:
+            # Need at least 1:2 from entry to TP3 (prev week extreme)
+            # Need price in proper DISCOUNT (BUY) or PREMIUM (SELL) zone
+
+            # 50 EMA filter on last 50 H1 closes (trend confirmation)
+            recent_closes = [c['close'] for c in h1_all[max(0, i-50):i+1]]
+            h1_ema = ema(recent_closes, 50)
+            if h1_ema is None:
+                continue
+
+            # Direction filter and entry rule
             if bias == 'BUY':
-                # Need: price below weekly open + H1 bullish engulfing
+                # Need:
+                #  1. Price below weekly open AND in DISCOUNT zone
+                #     (below midpoint of setup week range)
+                #  2. H1 bullish engulfing
+                #  3. Price near or above 50 EMA (don't fight extreme trend)
+                #  4. Min 1:2 RR from entry to TP3
                 if curr_h1['close'] >= trade_week_open:
                     continue
+                setup_mid = (setup_week['high'] + setup_week['low']) / 2
+                if curr_h1['close'] >= setup_mid:
+                    continue  # Not in discount zone
                 if not h1_bullish_engulfing(prev_h1, curr_h1):
                     continue
-                # Valid bullish entry
+
                 entry = curr_h1['close']
-                sl    = curr_h1['low'] - from_pips(2, pair)   # Below H1 engulf low
+                sl    = curr_h1['low'] - from_pips(3, pair)
                 risk  = entry - sl
                 if risk <= 0:
                     continue
-                tp1   = entry + risk                          # 1R
-                tp2   = (entry + setup_week['high']) / 2      # midpoint to prev week high
-                tp3   = setup_week['high']                    # prev week high
-                # Sanity: TP2 must be beyond TP1 and TP3 beyond TP2
+
+                # Skip if SL too tight (< 8 pips for forex, gives noise room)
+                if to_pips(risk, pair) < 8:
+                    continue
+
+                tp1   = entry + risk
+                tp2   = (entry + setup_week['high']) / 2
+                tp3   = setup_week['high']
+
+                # Min 1:2 RR to TP3
+                if (tp3 - entry) < risk * 2.0:
+                    continue
                 if tp2 <= tp1 or tp3 <= tp2:
                     continue
 
             else:  # SELL
                 if curr_h1['close'] <= trade_week_open:
                     continue
+                setup_mid = (setup_week['high'] + setup_week['low']) / 2
+                if curr_h1['close'] <= setup_mid:
+                    continue  # Not in premium zone
                 if not h1_bearish_engulfing(prev_h1, curr_h1):
                     continue
+
                 entry = curr_h1['close']
-                sl    = curr_h1['high'] + from_pips(2, pair)
+                sl    = curr_h1['high'] + from_pips(3, pair)
                 risk  = sl - entry
                 if risk <= 0:
                     continue
+
+                if to_pips(risk, pair) < 8:
+                    continue
+
                 tp1   = entry - risk
                 tp2   = (entry + setup_week['low']) / 2
                 tp3   = setup_week['low']
+
+                if (entry - tp3) < risk * 2.0:
+                    continue
                 if tp2 >= tp1 or tp3 >= tp2:
                     continue
 
