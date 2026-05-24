@@ -1352,11 +1352,32 @@ def analyse_ict_gold():
 # ─────────────────────────────────────────────
 # MAIN - single scan, triggered by GitHub Actions
 # ─────────────────────────────────────────────
+def is_market_open():
+    # Forex market is closed Saturday and most of Sunday UTC
+    # Closed: Saturday 00:00 UTC to Sunday 21:00 UTC
+    # BTC_USD trades 24/7 but we skip weekend for consistency
+    now     = datetime.now(timezone.utc)
+    weekday = now.weekday()  # 0=Mon, 5=Sat, 6=Sun
+    hour    = now.hour
+
+    if weekday == 5:  # Saturday - fully closed
+        return False
+    if weekday == 6 and hour < 21:  # Sunday before 21:00 UTC - closed
+        return False
+    return True
+
 def main():
     print("=" * 55)
     print("  FXAlexG + ICT Killzone Monitor - Single Scan")
     print("=" * 55)
     print("Scan @ " + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'))
+
+    # Skip everything if market is closed (weekend)
+    if not is_market_open():
+        now = datetime.now(timezone.utc)
+        print("Market is closed (weekend). Skipping scan.")
+        print("Market reopens Sunday 21:00 UTC.")
+        return
 
     print("\n--- Checking Active Trades ---")
     try:
