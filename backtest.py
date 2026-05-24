@@ -1,14 +1,14 @@
 # ═══════════════════════════════════════════════════════════════
-# Weekly Engulfing + H1 Engulfing Backtest - 2 Years
-# Strategy by trader from video transcript
+# MULTI-STRATEGY BACKTEST - Hybrid Trend Continuation + Pullback
+# Goal: High win rate + minimum 2RR
 #
-# Setup: Weekly outside-bar (engulfing) sweeps liquidity + reverses
-#   - Bullish: trades below prev week low, closes above prev week high
-#   - Bearish: trades above prev week high, closes below prev week low
-# Entry: H1 engulfing in direction of weekly bias
-#   - Price must be below (BUY) or above (SELL) weekly open
-# SL: H1 engulfing candle's opposite extreme
-# TP1=1R, TP2=mid to prev week extreme, TP3=prev week extreme
+# Strategy Logic:
+#   1. TREND IDENTIFIED on Daily (50 EMA + market structure)
+#   2. PULLBACK on H4 to discount/premium zone or 50 EMA
+#   3. CONFIRMATION on H1 (engulfing/pin bar with momentum)
+#   4. RR: TP1=2R (min), TP2=3R, TP3=4R or next AOI
+# Entry on candle CLOSE only. No look-ahead.
+# 2 Years - From Jan 2024
 # ═══════════════════════════════════════════════════════════════
 import requests, os, time
 from datetime import datetime, timezone, timedelta
@@ -21,13 +21,12 @@ TELEGRAM_CHAT_ID   = os.environ.get('TELEGRAM_CHAT_ID', '')
 PAIRS = [
     'EUR_USD', 'GBP_USD', 'USD_JPY', 'AUD_USD',
     'USD_CHF', 'NZD_USD', 'USD_CAD', 'XAU_USD'
-]  # BTC removed - too volatile for weekly engulfing
+]
 
 # ─── PIP HELPERS ─────────────────────────────────────────────
 def pip_size(pair):
     if 'JPY' in pair: return 0.01
     if 'XAU' in pair: return 0.10
-    if 'BTC' in pair: return 1.00
     return 0.0001
 
 def to_pips(diff, pair):
@@ -36,6 +35,7 @@ def to_pips(diff, pair):
 def from_pips(pips, pair):
     return pips * pip_size(pair)
 
+# ─── INDICATORS ──────────────────────────────────────────────
 def ema(values, period):
     if len(values) < period:
         return None
@@ -45,8 +45,33 @@ def ema(values, period):
         val = (p - val) * m + val
     return val
 
+def ema_series(values, period):
+    # Returns full EMA series for plotting/lookup
+    if len(values) < period:
+        return []
+    m   = 2 / (period + 1)
+    series = [None] * (period - 1)
+    val = sum(values[:period]) / period
+    series.append(val)
+    for p in values[period:]:
+        val = (p - val) * m + val
+        series.append(val)
+    return series
+
+def atr(candles, period=14):
+    if len(candles) < period + 1:
+        return None
+    trs = []
+    for i in range(1, len(candles)):
+        tr = max(
+            candles[i]['high'] - candles[i]['low'],
+            abs(candles[i]['high'] - candles[i-1]['close']),
+            abs(candles[i]['low']  - candles[i-1]['close'])
+        )
+        trs.append(tr)
+    return sum(trs[-period:]) / period
+
 def rsi(values, period=14):
-    # Standard RSI calculation
     if len(values) < period + 1:
         return None
     gains = losses = 0
@@ -68,19 +93,6 @@ def rsi(values, period=14):
         return 100
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
-
-def atr(candles, period=14):
-    if len(candles) < period + 1:
-        return None
-    trs = []
-    for i in range(1, len(candles)):
-        tr = max(
-            candles[i]['high'] - candles[i]['low'],
-            abs(candles[i]['high'] - candles[i-1]['close']),
-            abs(candles[i]['low']  - candles[i-1]['close'])
-        )
-        trs.append(tr)
-    return sum(trs[-period:]) / period
 
 # ─── FETCH DATA ──────────────────────────────────────────────
 def fetch_chunk(pair, granularity, from_dt):
@@ -138,178 +150,178 @@ def fetch_2years(pair, granularity):
             unique.append(c)
     return sorted(unique, key=lambda x: x['time'])
 
-# ─── CANDLE HELPERS ──────────────────────────────────────────
-def body_high(c): return max(c['open'], c['close'])
-def body_low(c):  return min(c['open'], c['close'])
+# ─── DAILY TREND IDENTIFICATION ─────────────────────────────
+def get_daily_trend(daily_candles):
+    # Trend defined by 50 EMA slope + price position
+    # Strong bullish: price above 50 EMA AND 50 EMA rising
+    # Strong bearish: price below 50 EMA AND 50 EMA falling
+    if len(daily_candles) < 60:
+        return 'NEUTRAL'
 
-# ─── WEEKLY ENGULFING DETECTION ─────────────────────────────
-def is_bullish_weekly_engulfing(curr, prev):
-    # Bullish weekly setup - 2 modes:
-    # MODE A: Full outside bar (strict)
-    #   - swept prev low + closed above prev high
-    # MODE B: Liquidity sweep + reversal (more common)
-    #   - swept prev low + closed above prev OPEN (reversal back into prev range)
-    rng = curr['high'] - curr['low']
+    closes = [c['close'] for c in daily_candles]
+    ema_now  = ema(closes, 50)
+    ema_5ago = ema(closes[:-5], 50)
+    if ema_now is None or ema_5ago is None:
+        return 'NEUTRAL'
+
+    price = daily_candles[-1]['close']
+    ema_rising  = ema_now > ema_5ago
+    ema_falling = ema_now < ema_5ago
+
+    if price > ema_now and ema_rising:
+        return 'BULLISH'
+    if price < ema_now and ema_falling:
+        return 'BEARISH'
+    return 'NEUTRAL'
+
+# ─── H4 PULLBACK ZONE CHECK ─────────────────────────────────
+def is_pullback_to_ema(h4_candles, direction):
+    # Pullback to 50 EMA means price has come back near the dynamic support/resistance
+    # within last 5 H4 candles
+    if len(h4_candles) < 60:
+        return False
+    closes = [c['close'] for c in h4_candles]
+    h4_ema = ema(closes, 50)
+    if h4_ema is None:
+        return False
+
+    # Check if recent 5 candles touched or got near the EMA
+    pair_atr = atr(h4_candles, 14) or 0
+    if pair_atr == 0:
+        return False
+
+    for c in h4_candles[-5:]:
+        # Within 1 ATR of the EMA = qualifies as pullback
+        if abs(c['low'] - h4_ema) < pair_atr or abs(c['high'] - h4_ema) < pair_atr:
+            if direction == 'BUY' and c['low'] <= h4_ema * 1.005:
+                return True
+            if direction == 'SELL' and c['high'] >= h4_ema * 0.995:
+                return True
+    return False
+
+# ─── H1 ENTRY CONFIRMATION ──────────────────────────────────
+def h1_bullish_confirmation(h1_candles):
+    # Need:
+    # 1. Last candle is bullish AND closes in upper 60% of its range
+    # 2. Body >= 50% of range (strong)
+    # 3. RSI < 65 (not extreme overbought)
+    if len(h1_candles) < 20:
+        return False
+    curr = h1_candles[-1]
+    if curr['close'] <= curr['open']:
+        return False
+    rng  = curr['high'] - curr['low']
     if rng <= 0:
         return False
     body = abs(curr['close'] - curr['open'])
-    close_position = (curr['close'] - curr['low']) / rng
+    close_pos = (curr['close'] - curr['low']) / rng
 
-    if not (curr['close'] > curr['open']):
+    if body < rng * 0.5:
         return False
-    if close_position < 0.55:        # Reasonable bullish close
-        return False
-    if body < rng * 0.35:            # Reasonable body
+    if close_pos < 0.6:
         return False
 
-    # Liquidity sweep is mandatory
-    swept_low = curr['low'] < prev['low']
-    if not swept_low:
+    closes = [c['close'] for c in h1_candles]
+    h1_rsi = rsi(closes, 14)
+    if h1_rsi is None or h1_rsi > 65:
         return False
 
-    # Either full break above prev high, OR strong reversal into prev range
-    full_engulf       = curr['close'] > prev['high']
-    sweep_and_reverse = curr['close'] > prev['open']  # closed back into prev body range
-    return full_engulf or sweep_and_reverse
+    return True
 
-def is_bearish_weekly_engulfing(curr, prev):
-    # Mirror logic for bearish
-    rng = curr['high'] - curr['low']
+def h1_bearish_confirmation(h1_candles):
+    if len(h1_candles) < 20:
+        return False
+    curr = h1_candles[-1]
+    if curr['close'] >= curr['open']:
+        return False
+    rng  = curr['high'] - curr['low']
     if rng <= 0:
         return False
     body = abs(curr['close'] - curr['open'])
-    close_position = (curr['close'] - curr['low']) / rng
+    close_pos = (curr['close'] - curr['low']) / rng
 
-    if not (curr['close'] < curr['open']):
+    if body < rng * 0.5:
         return False
-    if close_position > 0.45:
-        return False
-    if body < rng * 0.35:
+    if close_pos > 0.4:
         return False
 
-    swept_high = curr['high'] > prev['high']
-    if not swept_high:
+    closes = [c['close'] for c in h1_candles]
+    h1_rsi = rsi(closes, 14)
+    if h1_rsi is None or h1_rsi < 35:
         return False
 
-    full_engulf       = curr['close'] < prev['low']
-    sweep_and_reverse = curr['close'] < prev['open']
-    return full_engulf or sweep_and_reverse
+    return True
 
-# ─── H1 ENGULFING ENTRY SIGNAL ──────────────────────────────
-def h1_bullish_engulfing(prev, curr):
-    # Bullish entry candle (any of these qualifies):
-    # 1. Standard engulfing - curr body engulfs prev body
-    # 2. Strong bullish close - body 60%+ of range, green
-    # 3. Bullish pin bar - long lower wick rejecting lower prices
-    ph = max(prev['open'], prev['close'])
-    pl = min(prev['open'], prev['close'])
-    ch = max(curr['open'], curr['close'])
-    cl = min(curr['open'], curr['close'])
-    pb = abs(prev['close'] - prev['open'])
-    cb = abs(curr['close'] - curr['open'])
-    rng = curr['high'] - curr['low']
+# ─── H4 ENTRY (STRONG TREND CONTINUATION) ───────────────────
+def h4_bullish_confirmation(h4_candles):
+    # Same logic on H4 - stronger signal because higher TF
+    if len(h4_candles) < 20:
+        return False
+    curr = h4_candles[-1]
+    if curr['close'] <= curr['open']:
+        return False
+    rng  = curr['high'] - curr['low']
     if rng <= 0:
         return False
+    body = abs(curr['close'] - curr['open'])
     close_pos = (curr['close'] - curr['low']) / rng
-    lower_wick = cl - curr['low']
 
-    # Must be a green candle to start
-    if not (curr['close'] > curr['open']):
+    return body >= rng * 0.55 and close_pos >= 0.6
+
+def h4_bearish_confirmation(h4_candles):
+    if len(h4_candles) < 20:
         return False
-
-    # Mode A: Engulfing (loosened body requirement)
-    engulf = (prev['close'] < prev['open'] and
-              ch >= ph and cl <= pl and
-              cb >= pb * 0.9 and
-              close_pos >= 0.55)
-
-    # Mode B: Strong bullish bar
-    strong_bull = (cb >= rng * 0.6 and close_pos >= 0.65)
-
-    # Mode C: Bullish pin bar / hammer (rejection of lows)
-    pin_bar = (lower_wick >= cb * 1.5 and
-               lower_wick >= rng * 0.5 and
-               close_pos >= 0.55)
-
-    return engulf or strong_bull or pin_bar
-
-def h1_bearish_engulfing(prev, curr):
-    # Mirror for bearish entry
-    ph = max(prev['open'], prev['close'])
-    pl = min(prev['open'], prev['close'])
-    ch = max(curr['open'], curr['close'])
-    cl = min(curr['open'], curr['close'])
-    pb = abs(prev['close'] - prev['open'])
-    cb = abs(curr['close'] - curr['open'])
-    rng = curr['high'] - curr['low']
+    curr = h4_candles[-1]
+    if curr['close'] >= curr['open']:
+        return False
+    rng  = curr['high'] - curr['low']
     if rng <= 0:
         return False
+    body = abs(curr['close'] - curr['open'])
     close_pos = (curr['close'] - curr['low']) / rng
-    upper_wick = curr['high'] - ch
 
-    if not (curr['close'] < curr['open']):
-        return False
+    return body >= rng * 0.55 and close_pos <= 0.4
 
-    engulf = (prev['close'] > prev['open'] and
-              ch >= ph and cl <= pl and
-              cb >= pb * 0.9 and
-              close_pos <= 0.45)
+# ─── RECENT SWING POINTS FOR TP ─────────────────────────────
+def recent_swing_high(candles, lookback=20):
+    if len(candles) < lookback:
+        return None
+    return max(c['high'] for c in candles[-lookback:])
 
-    strong_bear = (cb >= rng * 0.6 and close_pos <= 0.35)
-
-    pin_bar = (upper_wick >= cb * 1.5 and
-               upper_wick >= rng * 0.5 and
-               close_pos <= 0.45)
-
-    return engulf or strong_bear or pin_bar
-
-# ─── GET WEEK START FROM TIMESTAMP ──────────────────────────
-def get_week_start(time_str):
-    # Returns Monday 00:00 UTC of the week containing this time
-    dt   = datetime.strptime(time_str[:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
-    days = dt.weekday()  # 0=Monday
-    monday = dt - timedelta(days=days, hours=dt.hour, minutes=dt.minute, seconds=dt.second)
-    return monday
+def recent_swing_low(candles, lookback=20):
+    if len(candles) < lookback:
+        return None
+    return min(c['low'] for c in candles[-lookback:])
 
 # ─── SIMULATE TRADE ─────────────────────────────────────────
 def simulate_trade(direction, entry, sl, tp1, tp2, tp3, future_candles):
-    # Use candle CLOSE for all decisions
-    # TP1 hit = WIN immediately + SL moves to BE
-    # TP2 hit = continues to TP3
-    # TP3 hit = full win
-    tp1_hit    = False
-    tp1_time   = None
-    tp2_hit    = False
-    tp2_time   = None
+    tp1_hit = tp2_hit = False
+    tp1_time = tp2_time = None
 
     for c in future_candles:
         close = c['close']
-
         if direction == 'BUY':
             effective_sl = entry if tp1_hit else sl
             if close <= effective_sl:
+                if tp1_hit and tp2_hit:
+                    return 'TP2', c['time'], tp2, True, True
                 if tp1_hit:
-                    if tp2_hit:
-                        return 'TP2', c['time'], tp2, True, True
                     return 'TP1', tp1_time, tp1, True, False
                 return 'SL', c['time'], close, False, False
-
             if not tp1_hit and close >= tp1:
                 tp1_hit, tp1_time = True, c['time']
             if tp1_hit and not tp2_hit and close >= tp2:
                 tp2_hit, tp2_time = True, c['time']
             if tp2_hit and close >= tp3:
                 return 'TP3', c['time'], tp3, True, True
-
-        else:  # SELL
+        else:
             effective_sl = entry if tp1_hit else sl
             if close >= effective_sl:
+                if tp1_hit and tp2_hit:
+                    return 'TP2', c['time'], tp2, True, True
                 if tp1_hit:
-                    if tp2_hit:
-                        return 'TP2', c['time'], tp2, True, True
                     return 'TP1', tp1_time, tp1, True, False
                 return 'SL', c['time'], close, False, False
-
             if not tp1_hit and close <= tp1:
                 tp1_hit, tp1_time = True, c['time']
             if tp1_hit and not tp2_hit and close <= tp2:
@@ -323,242 +335,147 @@ def simulate_trade(direction, entry, sl, tp1, tp2, tp3, future_candles):
         return 'TP1', tp1_time, tp1, True, False
     return 'OPEN', None, entry, False, False
 
-# ─── BACKTEST ONE PAIR ───────────────────────────────────────
-def backtest_pair(pair, h1_all, w_all):
+# ─── BACKTEST ONE PAIR ──────────────────────────────────────
+def backtest_pair(pair, h1_all, h4_all, d_all):
     print(chr(10) + '  ' + pair.replace('_', '/') + '...')
-    if len(w_all) < 5 or len(h1_all) < 200:
+    if len(h1_all) < 200 or len(d_all) < 60:
         print('    Not enough data')
         return []
 
-    trades     = []
-    open_trade = None
-    exit_bar   = -1
+    trades   = []
+    exit_bar = -1
 
-    # For each weekly candle, check if it qualifies as the "setup week"
-    # The trade week is the NEXT week after the setup week
-    for w_idx in range(1, len(w_all) - 1):
-        setup_week    = w_all[w_idx]
-        prev_week     = w_all[w_idx - 1]
-        next_week     = w_all[w_idx + 1] if w_idx + 1 < len(w_all) else None
-
-        # Check setup conditions
-        bias = None
-        if is_bullish_weekly_engulfing(setup_week, prev_week):
-            bias = 'BUY'
-        elif is_bearish_weekly_engulfing(setup_week, prev_week):
-            bias = 'SELL'
-
-        if not bias:
+    for i in range(120, len(h1_all) - 5):
+        if i <= exit_bar:
             continue
 
-        # Trade window: 2 weeks after setup (extended for more opportunities)
-        # Bias often plays out over a longer time horizon
-        trade_week_start = datetime.strptime(setup_week['time'][:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc) + timedelta(days=7)
-        trade_week_end   = trade_week_start + timedelta(days=14)
+        candle_time = h1_all[i]['time']
+        curr_dt     = datetime.strptime(candle_time[:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
 
-        # The setup week's open is the "weekly open" for trading
-        # Actually no - we want the NEXT week's open for the trade week
-        trade_week_open = None
+        # Get candles up to current point only (no lookahead)
+        h1_window = h1_all[max(0, i-100):i+1]
+        h4_window = [c for c in h4_all if c['time'] <= candle_time][-100:]
+        d_window  = [c for c in d_all  if c['time'] <= candle_time][-80:]
 
-        # Find H1 candles in the trade week
-        for i in range(1, len(h1_all)):
-            curr_h1 = h1_all[i]
-            prev_h1 = h1_all[i-1]
+        if len(h4_window) < 60 or len(d_window) < 60:
+            continue
 
-            curr_dt = datetime.strptime(curr_h1['time'][:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
+        # Step 1: Daily trend
+        trend = get_daily_trend(d_window)
+        if trend == 'NEUTRAL':
+            continue
 
-            if curr_dt < trade_week_start:
+        direction = 'BUY' if trend == 'BULLISH' else 'SELL'
+
+        # Step 2: H4 pullback to EMA
+        if not is_pullback_to_ema(h4_window, direction):
+            continue
+
+        # Step 3: Try H4 confirmation first (higher conviction)
+        # then H1 confirmation
+        entry_tf = None
+        if direction == 'BUY':
+            if h4_bullish_confirmation(h4_window):
+                entry_tf = 'H4'
+            elif h1_bullish_confirmation(h1_window):
+                entry_tf = 'H1'
+        else:
+            if h4_bearish_confirmation(h4_window):
+                entry_tf = 'H4'
+            elif h1_bearish_confirmation(h1_window):
+                entry_tf = 'H1'
+
+        if not entry_tf:
+            continue
+
+        # Step 4: Calculate SL and TPs
+        entry = h1_all[i]['close']
+        h4_atr = atr(h4_window, 14) or from_pips(20, pair)
+
+        if direction == 'BUY':
+            # SL below recent swing low or 1.5 ATR below entry whichever lower
+            recent_low = recent_swing_low(h1_window, 20) or entry
+            sl_struct  = recent_low - from_pips(3, pair)
+            sl_atr     = entry - h4_atr * 1.5
+            sl         = min(sl_struct, sl_atr)
+            risk = entry - sl
+            if risk <= 0:
                 continue
-            if curr_dt >= trade_week_end:
-                break
-
-            # Capture the trade week's open (first H1 of the week)
-            if trade_week_open is None:
-                trade_week_open = curr_h1['open']
-
-            # Don't enter new trade if one is open
-            if open_trade or i <= exit_bar:
+            if to_pips(risk, pair) < 10:
                 continue
-
-            # WIN-RATE BOOSTING FILTERS:
-            # 1. RSI must show oversold (BUY) / overbought (SELL) - mean reversion edge
-            # 2. 50 EMA filter - price must not be at trend extreme
-            # 3. ATR-based SL (wider stop = less likely stopped on noise)
-            # 4. TP1 placed at nearest H1 swing high/low if closer than 1R
-            #    (this dramatically improves win rate - take profit at REAL resistance)
-            # 5. Min 8 pip SL (avoid spread-killer trades)
-
-            recent_closes = [c['close'] for c in h1_all[max(0, i-60):i+1]]
-            h1_ema_50 = ema(recent_closes, 50)
-            h1_rsi    = rsi(recent_closes, 14)
-            h1_atr    = atr(h1_all[max(0, i-30):i+1], 14)
-            if h1_ema_50 is None or h1_rsi is None or h1_atr is None:
+            tp1 = entry + risk * 2.0   # MIN 2R
+            tp2 = entry + risk * 3.0
+            tp3 = entry + risk * 4.0
+        else:
+            recent_high = recent_swing_high(h1_window, 20) or entry
+            sl_struct   = recent_high + from_pips(3, pair)
+            sl_atr      = entry + h4_atr * 1.5
+            sl          = max(sl_struct, sl_atr)
+            risk = sl - entry
+            if risk <= 0:
                 continue
+            if to_pips(risk, pair) < 10:
+                continue
+            tp1 = entry - risk * 2.0
+            tp2 = entry - risk * 3.0
+            tp3 = entry - risk * 4.0
 
-            if bias == 'BUY':
-                if curr_h1['close'] >= trade_week_open:
-                    continue
-                setup_low  = setup_week['low']
-                setup_high = setup_week['high']
-                upper_60   = setup_low + (setup_high - setup_low) * 0.6
-                if curr_h1['close'] >= upper_60:
-                    continue
+        # Simulate
+        result, ex_time, ex_price, _, _ = simulate_trade(
+            direction, entry, sl, tp1, tp2, tp3, h1_all[i+1:i+500]
+        )
 
-                # RSI filter - want oversold for mean reversion BUY
-                # Below 45 = some oversold pressure
-                if h1_rsi > 45:
-                    continue
-
-                # Skip if price is way above 50 EMA (chasing tops)
-                if curr_h1['close'] > h1_ema_50 * 1.005:  # >0.5% above EMA
-                    continue
-
-                if not h1_bullish_engulfing(prev_h1, curr_h1):
-                    continue
-
-                entry = curr_h1['close']
-                # ATR-based SL - wider stop = fewer noise stop-outs
-                sl_buffer = max(h1_atr * 0.5, from_pips(5, pair))
-                sl    = curr_h1['low'] - sl_buffer
-                risk  = entry - sl
-                if risk <= 0:
-                    continue
-
-                if to_pips(risk, pair) < 8:
-                    continue
-
-                # Look for nearest swing high in last 30 H1 candles for TP1
-                # If found and closer than 1R, use it (more achievable target)
-                lookback = h1_all[max(0, i-30):i]
-                nearby_highs = [c['high'] for c in lookback if c['high'] > entry]
-                tp1_candidate = entry + risk  # default 1R
-
-                if nearby_highs:
-                    nearest_high = min(nearby_highs)  # nearest one above entry
-                    # Use it only if it gives at least 0.7R reward
-                    if nearest_high < tp1_candidate and (nearest_high - entry) >= risk * 0.7:
-                        tp1_candidate = nearest_high - from_pips(2, pair)  # small buffer
-
-                tp1 = tp1_candidate
-                tp2 = (entry + setup_week['high']) / 2
-                tp3 = setup_week['high']
-
-                if (tp3 - entry) < risk * 1.5:
-                    continue
-                if tp2 <= tp1 or tp3 <= tp2:
-                    continue
-
-            else:  # SELL
-                if curr_h1['close'] <= trade_week_open:
-                    continue
-                setup_low  = setup_week['low']
-                setup_high = setup_week['high']
-                lower_40   = setup_low + (setup_high - setup_low) * 0.4
-                if curr_h1['close'] <= lower_40:
-                    continue
-
-                # RSI filter - want overbought for mean reversion SELL
-                if h1_rsi < 55:
-                    continue
-
-                # Skip if price too far below EMA
-                if curr_h1['close'] < h1_ema_50 * 0.995:
-                    continue
-
-                if not h1_bearish_engulfing(prev_h1, curr_h1):
-                    continue
-
-                entry = curr_h1['close']
-                sl_buffer = max(h1_atr * 0.5, from_pips(5, pair))
-                sl    = curr_h1['high'] + sl_buffer
-                risk  = sl - entry
-                if risk <= 0:
-                    continue
-
-                if to_pips(risk, pair) < 8:
-                    continue
-
-                # Nearest swing low for TP1
-                lookback = h1_all[max(0, i-30):i]
-                nearby_lows = [c['low'] for c in lookback if c['low'] < entry]
-                tp1_candidate = entry - risk
-
-                if nearby_lows:
-                    nearest_low = max(nearby_lows)
-                    if nearest_low > tp1_candidate and (entry - nearest_low) >= risk * 0.7:
-                        tp1_candidate = nearest_low + from_pips(2, pair)
-
-                tp1 = tp1_candidate
-                tp2 = (entry + setup_week['low']) / 2
-                tp3 = setup_week['low']
-
-                if (entry - tp3) < risk * 1.5:
-                    continue
-                if tp2 >= tp1 or tp3 >= tp2:
-                    continue
-
-            # Simulate trade from next bar
-            result, ex_time, ex_price, _, _ = simulate_trade(
-                bias, entry, sl, tp1, tp2, tp3, h1_all[i+1:i+500]
-            )
-
-            if bias == 'BUY':
-                if result == 'TP3':
-                    pips = to_pips(tp3 - entry, pair)
-                elif result == 'TP2':
-                    pips = to_pips(tp2 - entry, pair)
-                elif result == 'TP1':
-                    pips = to_pips(tp1 - entry, pair)
-                elif result == 'SL':
-                    pips = -to_pips(entry - sl, pair)
-                else:
-                    pips = 0
+        if direction == 'BUY':
+            if result == 'TP3':
+                pips = to_pips(tp3 - entry, pair)
+            elif result == 'TP2':
+                pips = to_pips(tp2 - entry, pair)
+            elif result == 'TP1':
+                pips = to_pips(tp1 - entry, pair)
+            elif result == 'SL':
+                pips = -to_pips(entry - sl, pair)
             else:
-                if result == 'TP3':
-                    pips = to_pips(entry - tp3, pair)
-                elif result == 'TP2':
-                    pips = to_pips(entry - tp2, pair)
-                elif result == 'TP1':
-                    pips = to_pips(entry - tp1, pair)
-                elif result == 'SL':
-                    pips = -to_pips(sl - entry, pair)
-                else:
-                    pips = 0
+                pips = 0
+        else:
+            if result == 'TP3':
+                pips = to_pips(entry - tp3, pair)
+            elif result == 'TP2':
+                pips = to_pips(entry - tp2, pair)
+            elif result == 'TP1':
+                pips = to_pips(entry - tp1, pair)
+            elif result == 'SL':
+                pips = -to_pips(sl - entry, pair)
+            else:
+                pips = 0
 
-            trade_record = {
-                'pair':         pair,
-                'entry_time':   curr_h1['time'],
-                'direction':    bias,
-                'entry':        round(entry, 5),
-                'sl':           round(sl, 5),
-                'tp1':          round(tp1, 5),
-                'tp2':          round(tp2, 5),
-                'tp3':          round(tp3, 5),
-                'result':       result,
-                'exit_time':    ex_time,
-                'exit_price':   round(ex_price, 5) if ex_price else None,
-                'pips':         pips,
-                'pattern':      'WEEKLY+H1 ENGULF',
-            }
-            trades.append(trade_record)
+        trades.append({
+            'pair':       pair,
+            'entry_time': candle_time,
+            'direction':  direction,
+            'entry':      round(entry, 5),
+            'sl':         round(sl, 5),
+            'tp1':        round(tp1, 5),
+            'tp2':        round(tp2, 5),
+            'tp3':        round(tp3, 5),
+            'result':     result,
+            'exit_time':  ex_time,
+            'exit_price': round(ex_price, 5) if ex_price else None,
+            'pips':       pips,
+            'pattern':    'TREND+PULLBACK ' + entry_tf,
+        })
 
-            # Move exit_bar so we wait for trade to close
-            if result != 'OPEN':
-                exit_bar = next(
-                    (j for j in range(i+1, min(i+500, len(h1_all)))
-                     if h1_all[j]['time'] >= (ex_time or curr_h1['time'])),
-                    i
-                )
-            # Allow up to 2 entries per setup week if first one closes
-            # (covers cases where first dip fails but second works)
-            # No break - just rely on exit_bar to space trades properly
+        if result != 'OPEN':
+            exit_bar = next(
+                (j for j in range(i+1, min(i+500, len(h1_all)))
+                 if h1_all[j]['time'] >= (ex_time or candle_time)),
+                i + 1
+            )
 
     return trades
 
 # ─── SEND TELEGRAM ───────────────────────────────────────────
 def send_telegram(msg):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-        print('  Telegram not configured')
         return
     try:
         url  = 'https://api.telegram.org/bot' + TELEGRAM_BOT_TOKEN + '/sendMessage'
@@ -570,24 +487,20 @@ def send_telegram(msg):
 # ─── PRINT RESULTS ───────────────────────────────────────────
 def print_results(all_trades):
     NL  = chr(10)
-    NL2 = chr(10)
     SEP = '=' * 80
     print(NL + SEP)
-    print('  WEEKLY ENGULFING + H1 ENGULFING - 2 Years Backtest')
-    print('  Entry on H1 candle CLOSE in direction of weekly bias')
-    print('  TP1=1R | TP2=midpoint to prev wk extreme | TP3=prev wk extreme')
+    print('  TREND + PULLBACK BACKTEST - 2 Years')
+    print('  Daily trend + H4 EMA pullback + H1/H4 confirmation')
+    print('  TP1=2R | TP2=3R | TP3=4R')
     print(SEP)
 
     if not all_trades:
-        print('No trades found.')
-        send_telegram('<b>Weekly Engulfing Backtest</b>' + NL + 'No trades found.')
+        send_telegram('<b>Trend+Pullback Backtest</b>' + NL + 'No trades found.')
         return
 
     closed = [t for t in all_trades if t['result'] != 'OPEN']
     if not closed:
-        msg = 'Signals: ' + str(len(all_trades)) + ' but all still OPEN.'
-        print(msg)
-        send_telegram('<b>Weekly Engulfing Backtest</b>' + NL + msg)
+        send_telegram('<b>Trend+Pullback Backtest</b>' + NL + 'All trades still open.')
         return
 
     tp3s  = [t for t in closed if t['result'] == 'TP3']
@@ -613,160 +526,114 @@ def print_results(all_trades):
         else:
             cl = 0
 
-    print(NL + 'OVERALL STATISTICS:')
-    print('  Total signals:           ' + str(len(all_trades)))
-    print('  Closed trades:           ' + str(total))
-    print('  Still open:              ' + str(len(all_trades) - total))
-    print('  TP3 hit (max target):    ' + str(len(tp3s)))
-    print('  TP2 hit:                 ' + str(len(tp2s)))
-    print('  TP1 hit (1R):            ' + str(len(tp1s)))
-    print('  SL hit (loss):           ' + str(len(sls)))
-    print('  Win Rate (TP1+TP2+TP3):  ' + str(wr) + '%')
-    print('  Avg Win  (pips):         +' + str(avg_win))
-    print('  Avg Loss (pips):         ' + str(avg_sl))
-    print('  Total Pips P&L:          ' + str(tot_pip))
-    print('  Profit Factor:           ' + str(pf))
-    print('  Max Consecutive Losses:  ' + str(max_cl))
+    print(NL + 'OVERALL:')
+    print('  Signals: ' + str(len(all_trades)))
+    print('  Closed:  ' + str(total))
+    print('  TP3: ' + str(len(tp3s)) + ' | TP2: ' + str(len(tp2s)) +
+          ' | TP1: ' + str(len(tp1s)) + ' | SL: ' + str(len(sls)))
+    print('  Win Rate: ' + str(wr) + '%')
+    print('  Avg Win:  +' + str(avg_win) + 'p')
+    print('  Avg Loss: ' + str(avg_sl) + 'p')
+    print('  Total P&L: ' + str(tot_pip) + 'p')
+    print('  Profit Factor: ' + str(pf))
+    print('  Max Consec SL: ' + str(max_cl))
 
     print(NL + 'BY PAIR:')
-    print('  ' + 'Pair'.ljust(10) + 'Trades  Wins    WR%    TP1  TP2  TP3   SL   Pips')
-    print('  ' + '-' * 65)
+    print('  ' + 'Pair'.ljust(10) + 'Trades  Wins   WR%    TP1  TP2  TP3   SL   Pips')
     for pair in sorted(set(t['pair'] for t in closed)):
-        pt   = [t for t in closed if t['pair'] == pair]
-        pw   = [t for t in pt if t['result'] != 'SL']
-        pt1  = [t for t in pt if t['result'] == 'TP1']
-        pt2  = [t for t in pt if t['result'] == 'TP2']
-        pt3  = [t for t in pt if t['result'] == 'TP3']
-        psl  = [t for t in pt if t['result'] == 'SL']
-        wr_p = round(len(pw) / len(pt) * 100, 1) if pt else 0
-        pp_p = round(sum(t['pips'] for t in pt), 1)
+        pt = [t for t in closed if t['pair'] == pair]
+        pw = [t for t in pt if t['result'] != 'SL']
+        pt1 = [t for t in pt if t['result'] == 'TP1']
+        pt2 = [t for t in pt if t['result'] == 'TP2']
+        pt3 = [t for t in pt if t['result'] == 'TP3']
+        psl = [t for t in pt if t['result'] == 'SL']
+        wrp = round(len(pw) / len(pt) * 100, 1) if pt else 0
+        ppp = round(sum(t['pips'] for t in pt), 1)
         print('  ' + pair.replace('_', '/').ljust(10) +
-              str(len(pt)).rjust(5) +
-              str(len(pw)).rjust(6) +
-              str(wr_p).rjust(8) + '%' +
-              str(len(pt1)).rjust(5) +
-              str(len(pt2)).rjust(5) +
-              str(len(pt3)).rjust(5) +
-              str(len(psl)).rjust(5) +
-              str(pp_p).rjust(8))
+              str(len(pt)).rjust(5) + str(len(pw)).rjust(6) +
+              str(wrp).rjust(8) + '%' +
+              str(len(pt1)).rjust(5) + str(len(pt2)).rjust(5) +
+              str(len(pt3)).rjust(5) + str(len(psl)).rjust(5) +
+              str(ppp).rjust(8))
 
-    print(NL + 'FULL TRADE LOG:')
-    print('  ' + '-' * 110)
-    print('  ' +
-          'Entry Date'.ljust(12) +
-          'Pair'.ljust(10) +
-          'Dir'.ljust(5) +
-          'Entry'.ljust(10) +
-          'SL'.ljust(10) +
-          'TP1'.ljust(10) +
-          'TP2'.ljust(10) +
-          'TP3'.ljust(10) +
-          'Result'.ljust(8) +
-          'Exit'.ljust(12) +
-          'Pips')
-    print('  ' + '-' * 110)
+    print(NL + 'TRADES:')
     for t in all_trades:
         date = t['entry_time'][:10]
-        ep   = str(t['entry'])
-        sl_s = str(t['sl'])
-        t1   = str(t['tp1'])
-        t2   = str(t['tp2'])
-        t3   = str(t['tp3'])
-        xp   = str(t.get('exit_price', '-')) if t.get('exit_price') else 'OPEN'
-        pips = str(t['pips']) if t['result'] != 'OPEN' else '-'
-        print('  ' +
-              date.ljust(12) +
-              t['pair'].replace('_', '/').ljust(10) +
-              t['direction'].ljust(5) +
-              ep.ljust(10) +
-              sl_s.ljust(10) +
-              t1.ljust(10) +
-              t2.ljust(10) +
-              t3.ljust(10) +
-              t['result'].ljust(8) +
-              xp.ljust(12) +
-              pips)
+        print('  ' + date + ' ' + t['pair'].replace('_', '/').ljust(8) + ' ' +
+              t['direction'].ljust(5) + ' E:' + str(t['entry']) +
+              ' SL:' + str(t['sl']) + ' TP1:' + str(t['tp1']) +
+              ' TP2:' + str(t['tp2']) + ' TP3:' + str(t['tp3']) +
+              ' ' + t['result'].ljust(6) + ' ' + str(t['pips']) + 'p')
 
     print(NL + SEP)
 
-    # ── Telegram summary ──────────────────────────────────────
+    # ── Telegram summary ──
     tg = (
-        '<b>Weekly Engulfing Backtest - 2 Years</b>' + NL2 +
-        'TP1=1R | TP2=midpoint | TP3=prev week extreme' + NL2 + NL2 +
-        '<b>OVERALL:</b>' + NL2 +
-        'Signals: '       + str(len(all_trades)) + NL2 +
-        'Closed: '        + str(total)           + NL2 +
-        'TP3: '           + str(len(tp3s))       + NL2 +
-        'TP2: '           + str(len(tp2s))       + NL2 +
-        'TP1: '           + str(len(tp1s))       + NL2 +
-        'SL:  '           + str(len(sls))        + NL2 +
-        'Win Rate: <b>'   + str(wr) + '%</b>'    + NL2 +
-        'Avg Win:  +'     + str(avg_win) + 'p'   + NL2 +
-        'Avg Loss: '      + str(avg_sl)  + 'p'   + NL2 +
-        'Total P&L: '     + str(tot_pip) + 'p'   + NL2 +
-        'Profit Factor: ' + str(pf)              + NL2 +
-        'Max Consec SL: ' + str(max_cl)          + NL2 + NL2 +
-        '<b>BY PAIR:</b>' + NL2
+        '<b>Trend+Pullback Backtest - 2 Years</b>' + NL +
+        'Daily trend + H4 EMA pullback + H1/H4 entry' + NL +
+        'TP1=2R | TP2=3R | TP3=4R' + NL + NL +
+        '<b>OVERALL:</b>' + NL +
+        'Signals: ' + str(len(all_trades)) + NL +
+        'Closed: ' + str(total) + NL +
+        'TP3: ' + str(len(tp3s)) + NL +
+        'TP2: ' + str(len(tp2s)) + NL +
+        'TP1: ' + str(len(tp1s)) + NL +
+        'SL:  ' + str(len(sls)) + NL +
+        'Win Rate: <b>' + str(wr) + '%</b>' + NL +
+        'Avg Win:  +' + str(avg_win) + 'p' + NL +
+        'Avg Loss: ' + str(avg_sl) + 'p' + NL +
+        'Total P&L: ' + str(tot_pip) + 'p' + NL +
+        'Profit Factor: ' + str(pf) + NL +
+        'Max Consec SL: ' + str(max_cl) + NL + NL +
+        '<b>BY PAIR:</b>' + NL
     )
     for pair in sorted(set(t['pair'] for t in closed)):
-        pt   = [t for t in closed if t['pair'] == pair]
-        pw   = [t for t in pt if t['result'] != 'SL']
-        wr_p = round(len(pw) / len(pt) * 100, 1) if pt else 0
-        pp_p = round(sum(t['pips'] for t in pt), 1)
-        tg  += (pair.replace('_', '/').ljust(10) +
-                ' T:' + str(len(pt)) +
-                ' W:' + str(len(pw)) +
-                ' WR:' + str(wr_p) + '%' +
-                ' P&L:' + str(pp_p) + 'p' + NL2)
-
+        pt = [t for t in closed if t['pair'] == pair]
+        pw = [t for t in pt if t['result'] != 'SL']
+        wrp = round(len(pw) / len(pt) * 100, 1) if pt else 0
+        ppp = round(sum(t['pips'] for t in pt), 1)
+        tg += (pair.replace('_', '/').ljust(10) +
+               ' T:' + str(len(pt)) + ' W:' + str(len(pw)) +
+               ' WR:' + str(wrp) + '%' +
+               ' P&L:' + str(ppp) + 'p' + NL)
     send_telegram(tg)
 
-    # ── Send all trades in chunks of 30 ──────────────────────
+    # ── Trade chunks ──
     chunk_size = 30
     for cs in range(0, len(all_trades), chunk_size):
-        chunk     = all_trades[cs:cs + chunk_size]
-        chunk_num = (cs // chunk_size) + 1
-        total_c   = (len(all_trades) + chunk_size - 1) // chunk_size
-        m = ('<b>Trades ' + str(cs+1) + '-' +
-             str(min(cs+chunk_size, len(all_trades))) +
-             ' of ' + str(len(all_trades)) +
-             ' (Part ' + str(chunk_num) + '/' + str(total_c) + ')</b>' + NL2 +
-             'Date     Pair      Dir   Entry   SL      TP1     TP2     TP3     Res   Pips' + NL2 +
-             '-' * 80 + NL2)
+        chunk = all_trades[cs:cs + chunk_size]
+        m = ('<b>Trades ' + str(cs+1) + '-' + str(min(cs+chunk_size, len(all_trades))) +
+             ' of ' + str(len(all_trades)) + '</b>' + NL +
+             '-' * 60 + NL)
         for t in chunk:
             m += (t['entry_time'][:10] + ' ' +
                   t['pair'].replace('_', '/').ljust(8) + ' ' +
                   t['direction'].ljust(4) + ' ' +
-                  str(t['entry']).ljust(7) + ' ' +
-                  str(t['sl']).ljust(7) + ' ' +
-                  str(t['tp1']).ljust(7) + ' ' +
-                  str(t['tp2']).ljust(7) + ' ' +
-                  str(t['tp3']).ljust(7) + ' ' +
-                  t['result'].ljust(5) + ' ' +
-                  str(t['pips']) + NL2)
+                  str(t['entry']).ljust(7) + ' SL:' + str(t['sl']) +
+                  ' TP1:' + str(t['tp1']) + ' ' +
+                  t['result'].ljust(5) + ' ' + str(t['pips']) + 'p' + NL)
         send_telegram(m)
 
 # ─── MAIN ────────────────────────────────────────────────────
 def main():
     print('=' * 65)
-    print('  Weekly Engulfing + H1 Engulfing Backtester')
-    print('  2 Years - Candle CLOSE based - From Jan 2024')
+    print('  TREND + PULLBACK Backtester - 2 Years')
+    print('  High Win Rate Target - Min 2RR per Trade')
     print('=' * 65)
-    print('Fetching data... 5-8 minutes expected')
 
     all_trades = []
     for pair in PAIRS:
         try:
             print(chr(10) + 'Fetching ' + pair + '...')
             h1 = fetch_2years(pair, 'H1')
-            w  = fetch_2years(pair, 'W')
-            print('  H1:' + str(len(h1)) + ' W:' + str(len(w)))
+            h4 = fetch_2years(pair, 'H4')
+            d  = fetch_2years(pair, 'D')
+            print('  H1:' + str(len(h1)) + ' H4:' + str(len(h4)) + ' D:' + str(len(d)))
 
-            if len(h1) < 200 or len(w) < 5:
-                print('  Not enough data - skipping')
+            if len(h1) < 200 or len(d) < 60:
                 continue
 
-            trades = backtest_pair(pair, h1, w)
+            trades = backtest_pair(pair, h1, h4, d)
             all_trades.extend(trades)
             closed = [t for t in trades if t['result'] != 'OPEN']
             wins   = [t for t in closed if t['result'] != 'SL']
