@@ -258,8 +258,8 @@ def h1_bullish_confirmation(h1_candles):
     if h1_rsi is None or h1_ema20 is None:
         return False
 
-    # RSI sweet spot 40-60 (tightened)
-    if h1_rsi < 40 or h1_rsi > 60:
+    # RSI 35-65 sweet spot - balanced for 1.5R hybrid
+    if h1_rsi < 35 or h1_rsi > 65:
         return False
     # Price must be above H1 EMA 20 (intraday momentum aligned)
     if curr['close'] <= h1_ema20:
@@ -296,7 +296,7 @@ def h1_bearish_confirmation(h1_candles):
     if h1_rsi is None or h1_ema20 is None:
         return False
 
-    if h1_rsi < 40 or h1_rsi > 60:
+    if h1_rsi < 35 or h1_rsi > 65:
         return False
     if curr['close'] >= h1_ema20:
         return False
@@ -415,7 +415,7 @@ def backtest_pair(pair, h1_all, h4_all, d_all):
             continue
         # Cooldown: no new signals within 24 H1 bars (1 day) of last signal
         # Forces strategy to wait for fresh setup
-        if i - last_signal_bar < 24:  # 1 day cooldown - prevents clustered losses
+        if i - last_signal_bar < 16:  # 16-hour cooldown
             continue
 
         candle_time = h1_all[i]['time']
@@ -472,9 +472,9 @@ def backtest_pair(pair, h1_all, h4_all, d_all):
                 continue
             if to_pips(risk, pair) < 10:
                 continue
-            tp1 = entry + risk * 2.0   # MIN 2R
-            tp2 = entry + risk * 3.0
-            tp3 = entry + risk * 4.0
+            tp1 = entry + risk * 1.5   # Hybrid: 1.5R (was 2R)
+            tp2 = entry + risk * 2.5
+            tp3 = entry + risk * 3.5
         else:
             recent_high = recent_swing_high(h1_window, 20) or entry
             sl_struct   = recent_high + from_pips(3, pair)
@@ -485,9 +485,9 @@ def backtest_pair(pair, h1_all, h4_all, d_all):
                 continue
             if to_pips(risk, pair) < 10:
                 continue
-            tp1 = entry - risk * 2.0
-            tp2 = entry - risk * 3.0
-            tp3 = entry - risk * 4.0
+            tp1 = entry - risk * 1.5
+            tp2 = entry - risk * 2.5
+            tp3 = entry - risk * 3.5
 
         # Simulate
         result, ex_time, ex_price, _, _ = simulate_trade(
@@ -561,7 +561,7 @@ def print_results(all_trades):
     print(NL + SEP)
     print('  TREND + PULLBACK BACKTEST - 2 Years')
     print('  Daily trend + H4 EMA pullback + H1/H4 confirmation')
-    print('  TP1=2R | TP2=3R | TP3=4R')
+    print('  TP1=1.5R | TP2=2.5R | TP3=3.5R')
     print(SEP)
 
     if not all_trades:
@@ -641,7 +641,7 @@ def print_results(all_trades):
     tg = (
         '<b>Trend+Pullback Backtest - 2 Years</b>' + NL +
         'Daily trend + H4 EMA pullback + H1/H4 entry' + NL +
-        'TP1=2R | TP2=3R | TP3=4R' + NL + NL +
+        'TP1=1.5R | TP2=2.5R | TP3=3.5R' + NL + NL +
         '<b>OVERALL:</b>' + NL +
         'Signals: ' + str(len(all_trades)) + NL +
         'Closed: ' + str(total) + NL +
