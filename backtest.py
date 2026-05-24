@@ -45,6 +45,43 @@ def ema(values, period):
         val = (p - val) * m + val
     return val
 
+def rsi(values, period=14):
+    # Standard RSI calculation
+    if len(values) < period + 1:
+        return None
+    gains = losses = 0
+    for i in range(1, period + 1):
+        change = values[i] - values[i-1]
+        if change > 0:
+            gains += change
+        else:
+            losses -= change
+    avg_gain = gains / period
+    avg_loss = losses / period
+    for i in range(period + 1, len(values)):
+        change = values[i] - values[i-1]
+        gain   = max(change, 0)
+        loss   = max(-change, 0)
+        avg_gain = (avg_gain * (period - 1) + gain) / period
+        avg_loss = (avg_loss * (period - 1) + loss) / period
+    if avg_loss == 0:
+        return 100
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+def atr(candles, period=14):
+    if len(candles) < period + 1:
+        return None
+    trs = []
+    for i in range(1, len(candles)):
+        tr = max(
+            candles[i]['high'] - candles[i]['low'],
+            abs(candles[i]['high'] - candles[i-1]['close']),
+            abs(candles[i]['low']  - candles[i-1]['close'])
+        )
+        trs.append(tr)
+    return sum(trs[-period:]) / period
+
 # ─── FETCH DATA ──────────────────────────────────────────────
 def fetch_chunk(pair, granularity, from_dt):
     url     = OANDA_BASE_URL + '/v3/instruments/' + pair + '/candles'
@@ -343,50 +380,69 @@ def backtest_pair(pair, h1_all, w_all):
             if open_trade or i <= exit_bar:
                 continue
 
-            # Risk/reward sanity:
-            # Need at least 1:2 from entry to TP3 (prev week extreme)
-            # Need price in proper DISCOUNT (BUY) or PREMIUM (SELL) zone
+            # WIN-RATE BOOSTING FILTERS:
+            # 1. RSI must show oversold (BUY) / overbought (SELL) - mean reversion edge
+            # 2. 50 EMA filter - price must not be at trend extreme
+            # 3. ATR-based SL (wider stop = less likely stopped on noise)
+            # 4. TP1 placed at nearest H1 swing high/low if closer than 1R
+            #    (this dramatically improves win rate - take profit at REAL resistance)
+            # 5. Min 8 pip SL (avoid spread-killer trades)
 
-            # 50 EMA filter on last 50 H1 closes (trend confirmation)
-            recent_closes = [c['close'] for c in h1_all[max(0, i-50):i+1]]
-            h1_ema = ema(recent_closes, 50)
-            if h1_ema is None:
+            recent_closes = [c['close'] for c in h1_all[max(0, i-60):i+1]]
+            h1_ema_50 = ema(recent_closes, 50)
+            h1_rsi    = rsi(recent_closes, 14)
+            h1_atr    = atr(h1_all[max(0, i-30):i+1], 14)
+            if h1_ema_50 is None or h1_rsi is None or h1_atr is None:
                 continue
 
-            # Direction filter and entry rule
             if bias == 'BUY':
-                # Need:
-                #  1. Price below weekly open AND in DISCOUNT zone
-                #     (below midpoint of setup week range)
-                #  2. H1 bullish engulfing
-                #  3. Price near or above 50 EMA (don't fight extreme trend)
-                #  4. Min 1:2 RR from entry to TP3
                 if curr_h1['close'] >= trade_week_open:
                     continue
-                # Discount zone: lower 60% of setup week range (was 50%)
                 setup_low  = setup_week['low']
                 setup_high = setup_week['high']
                 upper_60   = setup_low + (setup_high - setup_low) * 0.6
                 if curr_h1['close'] >= upper_60:
-                    continue  # Not in discount zone
+                    continue
+
+                # RSI filter - want oversold for mean reversion BUY
+                # Below 45 = some oversold pressure
+                if h1_rsi > 45:
+                    continue
+
+                # Skip if price is way above 50 EMA (chasing tops)
+                if curr_h1['close'] > h1_ema_50 * 1.005:  # >0.5% above EMA
+                    continue
+
                 if not h1_bullish_engulfing(prev_h1, curr_h1):
                     continue
 
                 entry = curr_h1['close']
-                sl    = curr_h1['low'] - from_pips(3, pair)
+                # ATR-based SL - wider stop = fewer noise stop-outs
+                sl_buffer = max(h1_atr * 0.5, from_pips(5, pair))
+                sl    = curr_h1['low'] - sl_buffer
                 risk  = entry - sl
                 if risk <= 0:
                     continue
 
-                # Skip if SL too tight (< 8 pips for forex, gives noise room)
-                if to_pips(risk, pair) < 5:
+                if to_pips(risk, pair) < 8:
                     continue
 
-                tp1   = entry + risk
-                tp2   = (entry + setup_week['high']) / 2
-                tp3   = setup_week['high']
+                # Look for nearest swing high in last 30 H1 candles for TP1
+                # If found and closer than 1R, use it (more achievable target)
+                lookback = h1_all[max(0, i-30):i]
+                nearby_highs = [c['high'] for c in lookback if c['high'] > entry]
+                tp1_candidate = entry + risk  # default 1R
 
-                # Min 1:2 RR to TP3
+                if nearby_highs:
+                    nearest_high = min(nearby_highs)  # nearest one above entry
+                    # Use it only if it gives at least 0.7R reward
+                    if nearest_high < tp1_candidate and (nearest_high - entry) >= risk * 0.7:
+                        tp1_candidate = nearest_high - from_pips(2, pair)  # small buffer
+
+                tp1 = tp1_candidate
+                tp2 = (entry + setup_week['high']) / 2
+                tp3 = setup_week['high']
+
                 if (tp3 - entry) < risk * 1.5:
                     continue
                 if tp2 <= tp1 or tp3 <= tp2:
@@ -395,27 +451,46 @@ def backtest_pair(pair, h1_all, w_all):
             else:  # SELL
                 if curr_h1['close'] <= trade_week_open:
                     continue
-                # Premium zone: upper 60% of setup week range
                 setup_low  = setup_week['low']
                 setup_high = setup_week['high']
                 lower_40   = setup_low + (setup_high - setup_low) * 0.4
                 if curr_h1['close'] <= lower_40:
-                    continue  # Not in premium zone
+                    continue
+
+                # RSI filter - want overbought for mean reversion SELL
+                if h1_rsi < 55:
+                    continue
+
+                # Skip if price too far below EMA
+                if curr_h1['close'] < h1_ema_50 * 0.995:
+                    continue
+
                 if not h1_bearish_engulfing(prev_h1, curr_h1):
                     continue
 
                 entry = curr_h1['close']
-                sl    = curr_h1['high'] + from_pips(3, pair)
+                sl_buffer = max(h1_atr * 0.5, from_pips(5, pair))
+                sl    = curr_h1['high'] + sl_buffer
                 risk  = sl - entry
                 if risk <= 0:
                     continue
 
-                if to_pips(risk, pair) < 5:
+                if to_pips(risk, pair) < 8:
                     continue
 
-                tp1   = entry - risk
-                tp2   = (entry + setup_week['low']) / 2
-                tp3   = setup_week['low']
+                # Nearest swing low for TP1
+                lookback = h1_all[max(0, i-30):i]
+                nearby_lows = [c['low'] for c in lookback if c['low'] < entry]
+                tp1_candidate = entry - risk
+
+                if nearby_lows:
+                    nearest_low = max(nearby_lows)
+                    if nearest_low > tp1_candidate and (entry - nearest_low) >= risk * 0.7:
+                        tp1_candidate = nearest_low + from_pips(2, pair)
+
+                tp1 = tp1_candidate
+                tp2 = (entry + setup_week['low']) / 2
+                tp3 = setup_week['low']
 
                 if (entry - tp3) < risk * 1.5:
                     continue
