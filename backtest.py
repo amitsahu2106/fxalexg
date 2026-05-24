@@ -1,14 +1,8 @@
 # ═══════════════════════════════════════════════════════════════
-# MULTI-STRATEGY BACKTEST - Hybrid Trend Continuation + Pullback
-# Goal: High win rate + minimum 2RR
-#
-# Strategy Logic:
-#   1. TREND IDENTIFIED on Daily (50 EMA + market structure)
-#   2. PULLBACK on H4 to discount/premium zone or 50 EMA
-#   3. CONFIRMATION on H1 (engulfing/pin bar with momentum)
-#   4. RR: TP1=2R (min), TP2=3R, TP3=4R or next AOI
-# Entry on candle CLOSE only. No look-ahead.
-# 2 Years - From Jan 2024
+# STRATEGY S2: MEAN REVERSION - 65% WIN RATE TARGET
+# Trades reversions at RSI extremes + Bollinger band touches
+# TP1=0.75R | TP2=1.0R | TP3=1.5R (smaller targets = higher hit rate)
+# Entry on candle CLOSE only. No look-ahead. 2 years from Jan 2024
 # ═══════════════════════════════════════════════════════════════
 import requests, os, time
 from datetime import datetime, timezone, timedelta
@@ -36,40 +30,27 @@ def from_pips(pips, pair):
     return pips * pip_size(pair)
 
 # ─── INDICATORS ──────────────────────────────────────────────
-def ema(values, period):
+def sma(values, period):
     if len(values) < period:
         return None
-    m   = 2 / (period + 1)
-    val = sum(values[:period]) / period
-    for p in values[period:]:
-        val = (p - val) * m + val
-    return val
+    return sum(values[-period:]) / period
 
-def ema_series(values, period):
-    # Returns full EMA series for plotting/lookup
+def stddev(values, period):
     if len(values) < period:
-        return []
-    m   = 2 / (period + 1)
-    series = [None] * (period - 1)
-    val = sum(values[:period]) / period
-    series.append(val)
-    for p in values[period:]:
-        val = (p - val) * m + val
-        series.append(val)
-    return series
-
-def atr(candles, period=14):
-    if len(candles) < period + 1:
         return None
-    trs = []
-    for i in range(1, len(candles)):
-        tr = max(
-            candles[i]['high'] - candles[i]['low'],
-            abs(candles[i]['high'] - candles[i-1]['close']),
-            abs(candles[i]['low']  - candles[i-1]['close'])
-        )
-        trs.append(tr)
-    return sum(trs[-period:]) / period
+    avg = sma(values, period)
+    if avg is None:
+        return None
+    var = sum((v - avg) ** 2 for v in values[-period:]) / period
+    return var ** 0.5
+
+def bollinger(values, period=20, num_std=2):
+    # Returns (upper, middle, lower) Bollinger Bands
+    mid = sma(values, period)
+    sd  = stddev(values, period)
+    if mid is None or sd is None:
+        return None, None, None
+    return mid + num_std * sd, mid, mid - num_std * sd
 
 def rsi(values, period=14):
     if len(values) < period + 1:
@@ -93,6 +74,19 @@ def rsi(values, period=14):
         return 100
     rs = avg_gain / avg_loss
     return 100 - (100 / (1 + rs))
+
+def atr(candles, period=14):
+    if len(candles) < period + 1:
+        return None
+    trs = []
+    for i in range(1, len(candles)):
+        tr = max(
+            candles[i]['high'] - candles[i]['low'],
+            abs(candles[i]['high'] - candles[i-1]['close']),
+            abs(candles[i]['low']  - candles[i-1]['close'])
+        )
+        trs.append(tr)
+    return sum(trs[-period:]) / period
 
 # ─── FETCH DATA ──────────────────────────────────────────────
 def fetch_chunk(pair, granularity, from_dt):
@@ -150,212 +144,94 @@ def fetch_2years(pair, granularity):
             unique.append(c)
     return sorted(unique, key=lambda x: x['time'])
 
-# ─── DAILY TREND IDENTIFICATION ─────────────────────────────
-def get_daily_trend(daily_candles):
-    # STRONG TREND FILTER:
-    # 1. Price clearly on correct side of 50 EMA (1+ ATR away)
-    # 2. EMA slope clearly directional (0.2%+ over 10 days)
-    # 3. Last 20 daily candles - majority closing in trend direction
-    # 4. NOT in a ranging market (range expansion in last 10 days)
-    if len(daily_candles) < 60:
-        return 'NEUTRAL'
-
-    closes = [c['close'] for c in daily_candles]
-    ema_50 = ema(closes, 50)
-    ema_50_10ago = ema(closes[:-10], 50)
-    if ema_50 is None or ema_50_10ago is None:
-        return 'NEUTRAL'
-
-    pair_atr = atr(daily_candles, 14)
-    if not pair_atr:
-        return 'NEUTRAL'
-
-    price = daily_candles[-1]['close']
-    slope_pct = (ema_50 - ema_50_10ago) / ema_50_10ago * 100
-
-    # Need price at least 0.5 ATR away from EMA (clear trend, not chop)
-    dist_from_ema = abs(price - ema_50)
-    if dist_from_ema < pair_atr * 0.5:
-        return 'NEUTRAL'
-
-    # Count bullish vs bearish candles in last 20 days
-    last_20 = daily_candles[-20:]
-    bull_count = sum(1 for c in last_20 if c['close'] > c['open'])
-    bear_count = 20 - bull_count
-
-    if price > ema_50 and slope_pct > 0.2 and bull_count >= 12:
-        return 'BULLISH'
-    if price < ema_50 and slope_pct < -0.2 and bear_count >= 12:
-        return 'BEARISH'
-    return 'NEUTRAL'
-
-# ─── H4 PULLBACK ZONE CHECK ─────────────────────────────────
-def is_pullback_to_ema(h4_candles, direction):
-    # Pullback must ACTUALLY touch EMA in last 5 candles
-    # Current shows rejection AND current candle is the rejection candle
-    # (not just sitting up there for many bars)
-    if len(h4_candles) < 60:
-        return False
-    closes = [c['close'] for c in h4_candles]
-    h4_ema = ema(closes, 50)
-    if h4_ema is None:
+# ─── MEAN REVERSION SIGNALS ─────────────────────────────────
+def is_oversold_reversal(h1_candles, h4_candles):
+    # BUY signal at oversold extreme:
+    # 1. H1 price touches/breaks lower Bollinger band
+    # 2. H1 RSI < 30 (extreme oversold)
+    # 3. H1 current candle is bullish (reversal candle)
+    # 4. H4 NOT in strong bearish trend (avoid catching falling knife)
+    if len(h1_candles) < 30 or len(h4_candles) < 30:
         return False
 
-    last_5 = h4_candles[-5:]
-    curr   = h4_candles[-1]
-
-    if direction == 'BUY':
-        # Price must have touched or crossed the EMA in last 5 candles
-        tagged = any(c['low'] <= h4_ema for c in last_5)
-        # Current candle closes above the EMA
-        rejected = curr['close'] > h4_ema
-        # Current candle's low must be near/at EMA (this IS the rejection)
-        # OR previous candle was the rejection
-        recent_rejection = (curr['low'] <= h4_ema * 1.002 or
-                            h4_candles[-2]['low'] <= h4_ema * 1.002)
-        return tagged and rejected and recent_rejection
-    else:
-        tagged = any(c['high'] >= h4_ema for c in last_5)
-        rejected = curr['close'] < h4_ema
-        recent_rejection = (curr['high'] >= h4_ema * 0.998 or
-                            h4_candles[-2]['high'] >= h4_ema * 0.998)
-        return tagged and rejected and recent_rejection
-
-# ─── H1 ENTRY CONFIRMATION ──────────────────────────────────
-def h1_bullish_confirmation(h1_candles):
-    # H1 entry - HIGHER QUALITY:
-    # 1. Strong body (60%+)
-    # 2. Close in top 30% of range
-    # 3. RSI 40-60 sweet spot
-    # 4. Higher close than prev 2 candles (sustained momentum)
-    # 5. Above H1 EMA 20 (intraday trend aligned)
-    if len(h1_candles) < 30:
-        return False
+    h1_closes = [c['close'] for c in h1_candles]
     curr = h1_candles[-1]
     prev = h1_candles[-2]
-    prev2 = h1_candles[-3]
+
+    # Bollinger Band check - either current OR previous candle touched lower band
+    upper, mid, lower = bollinger(h1_closes, 20, 2)
+    if lower is None:
+        return False
+    touched_lower = (prev['low'] <= lower) or (curr['low'] <= lower)
+    if not touched_lower:
+        return False
+
+    # RSI must be extreme oversold
+    h1_rsi = rsi(h1_closes, 14)
+    if h1_rsi is None or h1_rsi > 35:  # Must be very oversold
+        return False
+
+    # Current candle must be bullish reversal
     if curr['close'] <= curr['open']:
         return False
-    rng  = curr['high'] - curr['low']
+    # Strong body required (60%+ of range)
+    rng = curr['high'] - curr['low']
     if rng <= 0:
         return False
-    body = abs(curr['close'] - curr['open'])
-    close_pos = (curr['close'] - curr['low']) / rng
-
-    if body < rng * 0.6:
-        return False
-    if close_pos < 0.7:
-        return False
-    # Must close higher than last 2 candles (no fake breakouts)
-    if curr['close'] <= prev['close']:
-        return False
-    if curr['close'] <= prev2['close']:
+    body = curr['close'] - curr['open']
+    if body < rng * 0.5:
         return False
 
-    closes = [c['close'] for c in h1_candles]
-    h1_rsi = rsi(closes, 14)
-    h1_ema20 = ema(closes, 20)
-    if h1_rsi is None or h1_ema20 is None:
+    # Close back inside bands (not just touching)
+    if curr['close'] <= lower:
         return False
 
-    # RSI 35-65 sweet spot - balanced for 1.5R hybrid
-    if h1_rsi < 35 or h1_rsi > 65:
-        return False
-    # Price must be above H1 EMA 20 (intraday momentum aligned)
-    if curr['close'] <= h1_ema20:
+    # H4 trend filter - don't buy if H4 is in strong downtrend
+    h4_closes = [c['close'] for c in h4_candles]
+    h4_sma_50 = sma(h4_closes, 50)
+    if h4_sma_50 and curr['close'] < h4_sma_50 * 0.985:  # >1.5% below H4 SMA = strong down
         return False
 
     return True
 
-def h1_bearish_confirmation(h1_candles):
-    if len(h1_candles) < 30:
+def is_overbought_reversal(h1_candles, h4_candles):
+    # SELL signal at overbought extreme - mirror logic
+    if len(h1_candles) < 30 or len(h4_candles) < 30:
         return False
+
+    h1_closes = [c['close'] for c in h1_candles]
     curr = h1_candles[-1]
     prev = h1_candles[-2]
-    prev2 = h1_candles[-3]
+
+    upper, mid, lower = bollinger(h1_closes, 20, 2)
+    if upper is None:
+        return False
+    touched_upper = (prev['high'] >= upper) or (curr['high'] >= upper)
+    if not touched_upper:
+        return False
+
+    h1_rsi = rsi(h1_closes, 14)
+    if h1_rsi is None or h1_rsi < 65:
+        return False
+
     if curr['close'] >= curr['open']:
         return False
-    rng  = curr['high'] - curr['low']
+    rng = curr['high'] - curr['low']
     if rng <= 0:
         return False
-    body = abs(curr['close'] - curr['open'])
-    close_pos = (curr['close'] - curr['low']) / rng
-
-    if body < rng * 0.6:
-        return False
-    if close_pos > 0.3:
-        return False
-    if curr['close'] >= prev['close']:
-        return False
-    if curr['close'] >= prev2['close']:
+    body = curr['open'] - curr['close']
+    if body < rng * 0.5:
         return False
 
-    closes = [c['close'] for c in h1_candles]
-    h1_rsi = rsi(closes, 14)
-    h1_ema20 = ema(closes, 20)
-    if h1_rsi is None or h1_ema20 is None:
+    if curr['close'] >= upper:
         return False
 
-    if h1_rsi < 35 or h1_rsi > 65:
-        return False
-    if curr['close'] >= h1_ema20:
+    h4_closes = [c['close'] for c in h4_candles]
+    h4_sma_50 = sma(h4_closes, 50)
+    if h4_sma_50 and curr['close'] > h4_sma_50 * 1.015:
         return False
 
     return True
-
-# ─── H4 ENTRY (STRONG TREND CONTINUATION) ───────────────────
-def h4_bullish_confirmation(h4_candles):
-    # H4 entry - HIGHER QUALITY:
-    # 1. Strong body (65%+ of range)
-    # 2. Close in top 25% of range
-    # 3. Higher close than 2 prev candles
-    if len(h4_candles) < 20:
-        return False
-    curr = h4_candles[-1]
-    prev = h4_candles[-2]
-    prev2 = h4_candles[-3]
-    if curr['close'] <= curr['open']:
-        return False
-    rng  = curr['high'] - curr['low']
-    if rng <= 0:
-        return False
-    body = abs(curr['close'] - curr['open'])
-    close_pos = (curr['close'] - curr['low']) / rng
-
-    return (body >= rng * 0.65 and
-            close_pos >= 0.75 and
-            curr['close'] > prev['close'] and
-            curr['close'] > prev2['close'])
-
-def h4_bearish_confirmation(h4_candles):
-    if len(h4_candles) < 20:
-        return False
-    curr = h4_candles[-1]
-    prev = h4_candles[-2]
-    prev2 = h4_candles[-3]
-    if curr['close'] >= curr['open']:
-        return False
-    rng  = curr['high'] - curr['low']
-    if rng <= 0:
-        return False
-    body = abs(curr['close'] - curr['open'])
-    close_pos = (curr['close'] - curr['low']) / rng
-
-    return (body >= rng * 0.65 and
-            close_pos <= 0.25 and
-            curr['close'] < prev['close'] and
-            curr['close'] < prev2['close'])
-
-# ─── RECENT SWING POINTS FOR TP ─────────────────────────────
-def recent_swing_high(candles, lookback=20):
-    if len(candles) < lookback:
-        return None
-    return max(c['high'] for c in candles[-lookback:])
-
-def recent_swing_low(candles, lookback=20):
-    if len(candles) < lookback:
-        return None
-    return min(c['low'] for c in candles[-lookback:])
 
 # ─── SIMULATE TRADE ─────────────────────────────────────────
 def simulate_trade(direction, entry, sl, tp1, tp2, tp3, future_candles):
@@ -400,98 +276,69 @@ def simulate_trade(direction, entry, sl, tp1, tp2, tp3, future_candles):
     return 'OPEN', None, entry, False, False
 
 # ─── BACKTEST ONE PAIR ──────────────────────────────────────
-def backtest_pair(pair, h1_all, h4_all, d_all):
+def backtest_pair(pair, h1_all, h4_all):
     print(chr(10) + '  ' + pair.replace('_', '/') + '...')
-    if len(h1_all) < 200 or len(d_all) < 60:
-        print('    Not enough data')
+    if len(h1_all) < 200 or len(h4_all) < 50:
         return []
 
-    trades   = []
+    trades = []
     exit_bar = -1
+    last_signal_bar = -100
 
-    last_signal_bar = -100  # Track when last signal fired
-    for i in range(120, len(h1_all) - 5):
+    for i in range(60, len(h1_all) - 5):
         if i <= exit_bar:
             continue
-        # Cooldown: no new signals within 24 H1 bars (1 day) of last signal
-        # Forces strategy to wait for fresh setup
-        if i - last_signal_bar < 16:  # 16-hour cooldown
+        # Cooldown - 8 hours minimum between signals
+        if i - last_signal_bar < 8:
             continue
 
         candle_time = h1_all[i]['time']
-        curr_dt     = datetime.strptime(candle_time[:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
+        h1_window = h1_all[max(0, i-60):i+1]
+        h4_window = [c for c in h4_all if c['time'] <= candle_time][-60:]
 
-        # Get candles up to current point only (no lookahead)
-        h1_window = h1_all[max(0, i-100):i+1]
-        h4_window = [c for c in h4_all if c['time'] <= candle_time][-100:]
-        d_window  = [c for c in d_all  if c['time'] <= candle_time][-80:]
-
-        if len(h4_window) < 60 or len(d_window) < 60:
+        if len(h4_window) < 50:
             continue
 
-        # Step 1: Daily trend
-        trend = get_daily_trend(d_window)
-        if trend == 'NEUTRAL':
+        direction = None
+        if is_oversold_reversal(h1_window, h4_window):
+            direction = 'BUY'
+        elif is_overbought_reversal(h1_window, h4_window):
+            direction = 'SELL'
+
+        if not direction:
             continue
 
-        direction = 'BUY' if trend == 'BULLISH' else 'SELL'
-
-        # Step 2: H4 pullback to EMA
-        if not is_pullback_to_ema(h4_window, direction):
-            continue
-
-        # Step 3: Try H4 confirmation first (higher conviction)
-        # then H1 confirmation
-        entry_tf = None
-        if direction == 'BUY':
-            if h4_bullish_confirmation(h4_window):
-                entry_tf = 'H4'
-            elif h1_bullish_confirmation(h1_window):
-                entry_tf = 'H1'
-        else:
-            if h4_bearish_confirmation(h4_window):
-                entry_tf = 'H4'
-            elif h1_bearish_confirmation(h1_window):
-                entry_tf = 'H1'
-
-        if not entry_tf:
-            continue
-
-        # Step 4: Calculate SL and TPs
+        # Calculate SL based on H1 ATR
         entry = h1_all[i]['close']
-        h4_atr = atr(h4_window, 14) or from_pips(20, pair)
+        h1_atr = atr(h1_window, 14) or from_pips(15, pair)
 
         if direction == 'BUY':
-            # SL below recent swing low or 1.5 ATR below entry whichever lower
-            recent_low = recent_swing_low(h1_window, 20) or entry
-            sl_struct  = recent_low - from_pips(3, pair)
-            sl_atr     = entry - h4_atr * 1.5
-            sl         = min(sl_struct, sl_atr)
+            # SL below recent low + 0.5 ATR buffer
+            recent_low = min(c['low'] for c in h1_window[-10:])
+            sl   = recent_low - h1_atr * 0.5
             risk = entry - sl
             if risk <= 0:
                 continue
-            if to_pips(risk, pair) < 10:
+            if to_pips(risk, pair) < 8:
                 continue
-            tp1 = entry + risk * 1.5   # Hybrid: 1.5R (was 2R)
-            tp2 = entry + risk * 2.5
-            tp3 = entry + risk * 3.5
+            # Tighter targets for higher win rate
+            tp1 = entry + risk * 0.75   # 0.75R - easy first target
+            tp2 = entry + risk * 1.0    # 1R
+            tp3 = entry + risk * 1.5    # 1.5R
         else:
-            recent_high = recent_swing_high(h1_window, 20) or entry
-            sl_struct   = recent_high + from_pips(3, pair)
-            sl_atr      = entry + h4_atr * 1.5
-            sl          = max(sl_struct, sl_atr)
+            recent_high = max(c['high'] for c in h1_window[-10:])
+            sl   = recent_high + h1_atr * 0.5
             risk = sl - entry
             if risk <= 0:
                 continue
-            if to_pips(risk, pair) < 10:
+            if to_pips(risk, pair) < 8:
                 continue
-            tp1 = entry - risk * 1.5
-            tp2 = entry - risk * 2.5
-            tp3 = entry - risk * 3.5
+            tp1 = entry - risk * 0.75
+            tp2 = entry - risk * 1.0
+            tp3 = entry - risk * 1.5
 
-        # Simulate
         result, ex_time, ex_price, _, _ = simulate_trade(
-            direction, entry, sl, tp1, tp2, tp3, h1_all[i+1:i+500]
+            direction, entry, sl, tp1, tp2, tp3, h1_all[i+1:i+200]
         )
 
         if direction == 'BUY':
@@ -530,13 +377,13 @@ def backtest_pair(pair, h1_all, h4_all, d_all):
             'exit_time':  ex_time,
             'exit_price': round(ex_price, 5) if ex_price else None,
             'pips':       pips,
-            'pattern':    'TREND+PULLBACK ' + entry_tf,
+            'pattern':    'BB+RSI MEAN REV',
         })
 
         last_signal_bar = i
         if result != 'OPEN':
             exit_bar = next(
-                (j for j in range(i+1, min(i+500, len(h1_all)))
+                (j for j in range(i+1, min(i+200, len(h1_all)))
                  if h1_all[j]['time'] >= (ex_time or candle_time)),
                 i + 1
             )
@@ -559,18 +406,17 @@ def print_results(all_trades):
     NL  = chr(10)
     SEP = '=' * 80
     print(NL + SEP)
-    print('  TREND + PULLBACK BACKTEST - 2 Years')
-    print('  Daily trend + H4 EMA pullback + H1/H4 confirmation')
-    print('  TP1=1.5R | TP2=2.5R | TP3=3.5R')
+    print('  STRATEGY S2: MEAN REVERSION - 2 Years Backtest')
+    print('  Bollinger Band + RSI extremes')
+    print('  TP1=0.75R | TP2=1.0R | TP3=1.5R')
     print(SEP)
 
     if not all_trades:
-        send_telegram('<b>Trend+Pullback Backtest</b>' + NL + 'No trades found.')
+        send_telegram('<b>S2 Mean Reversion Backtest</b>' + NL + 'No trades.')
         return
 
     closed = [t for t in all_trades if t['result'] != 'OPEN']
     if not closed:
-        send_telegram('<b>Trend+Pullback Backtest</b>' + NL + 'All trades still open.')
         return
 
     tp3s  = [t for t in closed if t['result'] == 'TP3']
@@ -609,39 +455,33 @@ def print_results(all_trades):
     print('  Max Consec SL: ' + str(max_cl))
 
     print(NL + 'BY PAIR:')
-    print('  ' + 'Pair'.ljust(10) + 'Trades  Wins   WR%    TP1  TP2  TP3   SL   Pips')
     for pair in sorted(set(t['pair'] for t in closed)):
         pt = [t for t in closed if t['pair'] == pair]
         pw = [t for t in pt if t['result'] != 'SL']
-        pt1 = [t for t in pt if t['result'] == 'TP1']
-        pt2 = [t for t in pt if t['result'] == 'TP2']
-        pt3 = [t for t in pt if t['result'] == 'TP3']
-        psl = [t for t in pt if t['result'] == 'SL']
         wrp = round(len(pw) / len(pt) * 100, 1) if pt else 0
         ppp = round(sum(t['pips'] for t in pt), 1)
         print('  ' + pair.replace('_', '/').ljust(10) +
-              str(len(pt)).rjust(5) + str(len(pw)).rjust(6) +
-              str(wrp).rjust(8) + '%' +
-              str(len(pt1)).rjust(5) + str(len(pt2)).rjust(5) +
-              str(len(pt3)).rjust(5) + str(len(psl)).rjust(5) +
-              str(ppp).rjust(8))
+              ' T:' + str(len(pt)).rjust(3) +
+              ' W:' + str(len(pw)).rjust(3) +
+              ' WR:' + str(wrp).rjust(6) + '%' +
+              ' P&L:' + str(ppp).rjust(7) + 'p')
 
     print(NL + 'TRADES:')
     for t in all_trades:
-        date = t['entry_time'][:10]
-        print('  ' + date + ' ' + t['pair'].replace('_', '/').ljust(8) + ' ' +
-              t['direction'].ljust(5) + ' E:' + str(t['entry']) +
-              ' SL:' + str(t['sl']) + ' TP1:' + str(t['tp1']) +
-              ' TP2:' + str(t['tp2']) + ' TP3:' + str(t['tp3']) +
+        print('  ' + t['entry_time'][:10] + ' ' +
+              t['pair'].replace('_', '/').ljust(8) + ' ' +
+              t['direction'].ljust(5) +
+              ' E:' + str(t['entry']) +
+              ' SL:' + str(t['sl']) +
+              ' TP1:' + str(t['tp1']) +
+              ' TP2:' + str(t['tp2']) +
+              ' TP3:' + str(t['tp3']) +
               ' ' + t['result'].ljust(6) + ' ' + str(t['pips']) + 'p')
 
-    print(NL + SEP)
-
-    # ── Telegram summary ──
+    # Telegram
     tg = (
-        '<b>Trend+Pullback Backtest - 2 Years</b>' + NL +
-        'Daily trend + H4 EMA pullback + H1/H4 entry' + NL +
-        'TP1=1.5R | TP2=2.5R | TP3=3.5R' + NL + NL +
+        '<b>S2 Mean Reversion - 2 Years</b>' + NL +
+        'BB + RSI extremes | TP1=0.75R TP2=1R TP3=1.5R' + NL + NL +
         '<b>OVERALL:</b>' + NL +
         'Signals: ' + str(len(all_trades)) + NL +
         'Closed: ' + str(total) + NL +
@@ -664,31 +504,27 @@ def print_results(all_trades):
         ppp = round(sum(t['pips'] for t in pt), 1)
         tg += (pair.replace('_', '/').ljust(10) +
                ' T:' + str(len(pt)) + ' W:' + str(len(pw)) +
-               ' WR:' + str(wrp) + '%' +
-               ' P&L:' + str(ppp) + 'p' + NL)
+               ' WR:' + str(wrp) + '% P&L:' + str(ppp) + 'p' + NL)
     send_telegram(tg)
 
-    # ── Trade chunks ──
     chunk_size = 30
     for cs in range(0, len(all_trades), chunk_size):
         chunk = all_trades[cs:cs + chunk_size]
         m = ('<b>Trades ' + str(cs+1) + '-' + str(min(cs+chunk_size, len(all_trades))) +
-             ' of ' + str(len(all_trades)) + '</b>' + NL +
-             '-' * 60 + NL)
+             ' of ' + str(len(all_trades)) + '</b>' + NL + '-' * 60 + NL)
         for t in chunk:
             m += (t['entry_time'][:10] + ' ' +
                   t['pair'].replace('_', '/').ljust(8) + ' ' +
-                  t['direction'].ljust(4) + ' ' +
-                  str(t['entry']).ljust(7) + ' SL:' + str(t['sl']) +
-                  ' TP1:' + str(t['tp1']) + ' ' +
-                  t['result'].ljust(5) + ' ' + str(t['pips']) + 'p' + NL)
+                  t['direction'].ljust(4) + ' E:' + str(t['entry']) +
+                  ' SL:' + str(t['sl']) + ' TP1:' + str(t['tp1']) +
+                  ' ' + t['result'].ljust(5) + ' ' + str(t['pips']) + 'p' + NL)
         send_telegram(m)
 
 # ─── MAIN ────────────────────────────────────────────────────
 def main():
     print('=' * 65)
-    print('  TREND + PULLBACK Backtester - 2 Years')
-    print('  High Win Rate Target - Min 2RR per Trade')
+    print('  STRATEGY S2: Mean Reversion - 2 Years')
+    print('  Bollinger Band + RSI extremes (65% WR target)')
     print('=' * 65)
 
     all_trades = []
@@ -697,13 +533,10 @@ def main():
             print(chr(10) + 'Fetching ' + pair + '...')
             h1 = fetch_2years(pair, 'H1')
             h4 = fetch_2years(pair, 'H4')
-            d  = fetch_2years(pair, 'D')
-            print('  H1:' + str(len(h1)) + ' H4:' + str(len(h4)) + ' D:' + str(len(d)))
-
-            if len(h1) < 200 or len(d) < 60:
+            print('  H1:' + str(len(h1)) + ' H4:' + str(len(h4)))
+            if len(h1) < 200:
                 continue
-
-            trades = backtest_pair(pair, h1, h4, d)
+            trades = backtest_pair(pair, h1, h4)
             all_trades.extend(trades)
             closed = [t for t in trades if t['result'] != 'OPEN']
             wins   = [t for t in closed if t['result'] != 'SL']
