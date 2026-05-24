@@ -1,0 +1,163 @@
+name: Close Active Trade
+
+on:
+  workflow_dispatch:
+    inputs:
+      pair:
+        description: 'Pair name (e.g. EUR_USD). Closes all trades for this pair if no trade_key given.'
+        required: false
+        type: string
+      trade_key:
+        description: 'Specific trade key to close (e.g. EUR_USD_2025-05-22_14:00). Overrides pair input.'
+        required: false
+        type: string
+      close_all: no
+        description: 'Close ALL active trades across all pairs? (yes/no)'
+        required: false
+        default: 'no'
+        type: string
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  close_trade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Close Trade
+        env:
+          PAIR:               ${{ github.event.inputs.pair }}
+          TRADE_KEY:          ${{ github.event.inputs.trade_key }}
+          CLOSE_ALL:          ${{ github.event.inputs.close_all }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os, requests
+
+          PAIR      = os.environ.get('PAIR', '').strip().upper()
+          TRADE_KEY = os.environ.get('TRADE_KEY', '').strip()
+          CLOSE_ALL = os.environ.get('CLOSE_ALL', 'no').strip().lower()
+          BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
+          CHAT_ID   = os.environ.get('TELEGRAM_CHAT_ID', '')
+
+          def send_telegram(msg):
+              if not BOT_TOKEN or not CHAT_ID:
+                  return
+              try:
+                  requests.post(
+                      'https://api.telegram.org/bot' + BOT_TOKEN + '/sendMessage',
+                      json={'chat_id': CHAT_ID, 'text': msg},
+                      timeout=10
+                  )
+              except:
+                  pass
+
+          def load_trades():
+              try:
+                  with open('trades.json', 'r') as f:
+                      return json.load(f)
+              except:
+                  return {}
+
+          def save_trades(trades):
+              with open('trades.json', 'w') as f:
+                  json.dump(trades, f, indent=2)
+
+          trades      = load_trades()
+          real_trades = {k: v for k, v in trades.items() if not k.startswith('_')}
+          removed     = []
+
+          # Show all active trades first so user can see what exists
+          print('Current active trades:')
+          if real_trades:
+              for k, v in real_trades.items():
+                  print('  ' + k + ' | Dir: ' + v.get('direction','?') +
+                        ' | Entry: ' + str(v.get('entry','?')) +
+                        ' | Opened: ' + v.get('opened_at','?'))
+          else:
+              print('  None')
+
+          # ── Case 1: Close specific trade by exact key ──────────────
+          if TRADE_KEY:
+              if TRADE_KEY in real_trades:
+                  removed.append(TRADE_KEY)
+                  del trades[TRADE_KEY]
+                  save_trades(trades)
+                  msg = ('Trade closed manually:' + chr(10) +
+                         TRADE_KEY + chr(10) +
+                         'New signals for this pair will now be tracked.')
+              else:
+                  msg = ('Trade key not found: ' + TRADE_KEY + chr(10) +
+                         'Available keys:' + chr(10) +
+                         chr(10).join('  ' + k for k in real_trades.keys()) or '  None')
+              print(msg)
+              send_telegram(msg)
+
+          # ── Case 2: Close all trades for a specific pair ───────────
+          elif PAIR:
+              for key in list(real_trades.keys()):
+                  if real_trades[key].get('pair', '') == PAIR or key.startswith(PAIR):
+                      removed.append(key)
+                      del trades[key]
+              if removed:
+                  save_trades(trades)
+                  msg = ('Manually closed ' + str(len(removed)) +
+                         ' trade(s) for ' + PAIR.replace('_', '/') + ':' + chr(10))
+                  for r in removed:
+                      msg += '  ' + r + chr(10)
+                  msg += 'New signals for this pair will now be tracked.'
+              else:
+                  msg = ('No active trades found for ' + PAIR + '.' + chr(10) +
+                         'Available: ' + ', '.join(real_trades.keys()) or 'None')
+              print(msg)
+              send_telegram(msg)
+
+          # ── Case 3: Close ALL trades ───────────────────────────────
+          elif CLOSE_ALL == 'yes':
+              for key in list(real_trades.keys()):
+                  removed.append(key)
+                  del trades[key]
+              save_trades(trades)
+              msg = ('All ' + str(len(removed)) + ' active trade(s) closed manually.' +
+                     chr(10) + chr(10).join('  ' + r for r in removed))
+              print(msg)
+              send_telegram(msg)
+
+          # ── No input given: just show active trades ────────────────
+          else:
+              msg = ('No action taken. Active trades:' + chr(10) +
+                     chr(10).join('  ' + k for k in real_trades.keys()) or '  None')
+              print(msg)
+              send_telegram(msg)
+
+          PYEOF
+
+      - name: Save updated trades to repo
+        run: |
+          git config user.name  "FXAlexG Bot"
+          git config user.email "bot@fxalexg.com"
+          git add trades.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Manual trade close [$(date -u '+%Y-%m-%d %H:%M UTC')]"
+            git push
+          fi
