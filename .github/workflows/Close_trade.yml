@@ -11,7 +11,7 @@ on:
         description: 'Specific trade key to close (e.g. EUR_USD_2025-05-22_14:00). Overrides pair input.'
         required: false
         type: string
-      close_all: no
+      close_all:
         description: 'Close ALL active trades across all pairs? (yes/no)'
         required: false
         default: 'no'
