@@ -152,9 +152,11 @@ def fetch_2years(pair, granularity):
 
 # ─── DAILY TREND IDENTIFICATION ─────────────────────────────
 def get_daily_trend(daily_candles):
-    # Trend filter:
-    # 1. Price on correct side of 50 EMA
-    # 2. 50 EMA has clear slope over 10 days
+    # STRONG TREND FILTER:
+    # 1. Price clearly on correct side of 50 EMA (1+ ATR away)
+    # 2. EMA slope clearly directional (0.2%+ over 10 days)
+    # 3. Last 20 daily candles - majority closing in trend direction
+    # 4. NOT in a ranging market (range expansion in last 10 days)
     if len(daily_candles) < 60:
         return 'NEUTRAL'
 
@@ -164,20 +166,34 @@ def get_daily_trend(daily_candles):
     if ema_50 is None or ema_50_10ago is None:
         return 'NEUTRAL'
 
+    pair_atr = atr(daily_candles, 14)
+    if not pair_atr:
+        return 'NEUTRAL'
+
     price = daily_candles[-1]['close']
     slope_pct = (ema_50 - ema_50_10ago) / ema_50_10ago * 100
 
-    # Need at least 0.1% slope over 10 days (much looser)
-    if price > ema_50 and slope_pct > 0.1:
+    # Need price at least 0.5 ATR away from EMA (clear trend, not chop)
+    dist_from_ema = abs(price - ema_50)
+    if dist_from_ema < pair_atr * 0.5:
+        return 'NEUTRAL'
+
+    # Count bullish vs bearish candles in last 20 days
+    last_20 = daily_candles[-20:]
+    bull_count = sum(1 for c in last_20 if c['close'] > c['open'])
+    bear_count = 20 - bull_count
+
+    if price > ema_50 and slope_pct > 0.2 and bull_count >= 12:
         return 'BULLISH'
-    if price < ema_50 and slope_pct < -0.1:
+    if price < ema_50 and slope_pct < -0.2 and bear_count >= 12:
         return 'BEARISH'
     return 'NEUTRAL'
 
 # ─── H4 PULLBACK ZONE CHECK ─────────────────────────────────
 def is_pullback_to_ema(h4_candles, direction):
-    # Pullback to H4 50 EMA in last 10 candles
-    # Current must be back on correct side (showing rejection)
+    # Pullback must ACTUALLY touch EMA in last 5 candles
+    # Current shows rejection AND current candle is the rejection candle
+    # (not just sitting up there for many bars)
     if len(h4_candles) < 60:
         return False
     closes = [c['close'] for c in h4_candles]
@@ -185,31 +201,39 @@ def is_pullback_to_ema(h4_candles, direction):
     if h4_ema is None:
         return False
 
-    pair_atr_val = atr(h4_candles, 14) or 0
-    if pair_atr_val == 0:
-        return False
-
-    last_10 = h4_candles[-10:]
-    curr    = h4_candles[-1]
+    last_5 = h4_candles[-5:]
+    curr   = h4_candles[-1]
 
     if direction == 'BUY':
-        # Tagged or close to EMA in last 10 candles (within 0.5 ATR)
-        tagged = any(c['low'] <= h4_ema + pair_atr_val * 0.5 for c in last_10)
-        # Current closes above EMA (rejection)
+        # Price must have touched or crossed the EMA in last 5 candles
+        tagged = any(c['low'] <= h4_ema for c in last_5)
+        # Current candle closes above the EMA
         rejected = curr['close'] > h4_ema
-        return tagged and rejected
+        # Current candle's low must be near/at EMA (this IS the rejection)
+        # OR previous candle was the rejection
+        recent_rejection = (curr['low'] <= h4_ema * 1.002 or
+                            h4_candles[-2]['low'] <= h4_ema * 1.002)
+        return tagged and rejected and recent_rejection
     else:
-        tagged   = any(c['high'] >= h4_ema - pair_atr_val * 0.5 for c in last_10)
+        tagged = any(c['high'] >= h4_ema for c in last_5)
         rejected = curr['close'] < h4_ema
-        return tagged and rejected
+        recent_rejection = (curr['high'] >= h4_ema * 0.998 or
+                            h4_candles[-2]['high'] >= h4_ema * 0.998)
+        return tagged and rejected and recent_rejection
 
 # ─── H1 ENTRY CONFIRMATION ──────────────────────────────────
 def h1_bullish_confirmation(h1_candles):
-    # H1 entry: solid body + RSI sweet spot
-    if len(h1_candles) < 20:
+    # H1 entry - HIGHER QUALITY:
+    # 1. Strong body (60%+)
+    # 2. Close in top 30% of range
+    # 3. RSI 40-60 sweet spot
+    # 4. Higher close than prev 2 candles (sustained momentum)
+    # 5. Above H1 EMA 20 (intraday trend aligned)
+    if len(h1_candles) < 30:
         return False
     curr = h1_candles[-1]
     prev = h1_candles[-2]
+    prev2 = h1_candles[-3]
     if curr['close'] <= curr['open']:
         return False
     rng  = curr['high'] - curr['low']
@@ -218,28 +242,37 @@ def h1_bullish_confirmation(h1_candles):
     body = abs(curr['close'] - curr['open'])
     close_pos = (curr['close'] - curr['low']) / rng
 
-    if body < rng * 0.55:
+    if body < rng * 0.6:
         return False
-    if close_pos < 0.65:
+    if close_pos < 0.7:
         return False
+    # Must close higher than last 2 candles (no fake breakouts)
     if curr['close'] <= prev['close']:
+        return False
+    if curr['close'] <= prev2['close']:
         return False
 
     closes = [c['close'] for c in h1_candles]
     h1_rsi = rsi(closes, 14)
-    if h1_rsi is None:
+    h1_ema20 = ema(closes, 20)
+    if h1_rsi is None or h1_ema20 is None:
         return False
-    # Sweet spot for trend continuation buys
-    if h1_rsi < 35 or h1_rsi > 65:
+
+    # RSI sweet spot 40-60 (tightened)
+    if h1_rsi < 40 or h1_rsi > 60:
+        return False
+    # Price must be above H1 EMA 20 (intraday momentum aligned)
+    if curr['close'] <= h1_ema20:
         return False
 
     return True
 
 def h1_bearish_confirmation(h1_candles):
-    if len(h1_candles) < 20:
+    if len(h1_candles) < 30:
         return False
     curr = h1_candles[-1]
     prev = h1_candles[-2]
+    prev2 = h1_candles[-3]
     if curr['close'] >= curr['open']:
         return False
     rng  = curr['high'] - curr['low']
@@ -248,32 +281,39 @@ def h1_bearish_confirmation(h1_candles):
     body = abs(curr['close'] - curr['open'])
     close_pos = (curr['close'] - curr['low']) / rng
 
-    if body < rng * 0.55:
+    if body < rng * 0.6:
         return False
-    if close_pos > 0.35:
+    if close_pos > 0.3:
         return False
     if curr['close'] >= prev['close']:
+        return False
+    if curr['close'] >= prev2['close']:
         return False
 
     closes = [c['close'] for c in h1_candles]
     h1_rsi = rsi(closes, 14)
-    if h1_rsi is None:
+    h1_ema20 = ema(closes, 20)
+    if h1_rsi is None or h1_ema20 is None:
         return False
-    if h1_rsi < 35 or h1_rsi > 65:
+
+    if h1_rsi < 40 or h1_rsi > 60:
+        return False
+    if curr['close'] >= h1_ema20:
         return False
 
     return True
 
 # ─── H4 ENTRY (STRONG TREND CONTINUATION) ───────────────────
 def h4_bullish_confirmation(h4_candles):
-    # H4 entry:
-    # 1. Green body 55%+ of range
-    # 2. Close in top 65% of range
-    # 3. Higher close than prev
+    # H4 entry - HIGHER QUALITY:
+    # 1. Strong body (65%+ of range)
+    # 2. Close in top 25% of range
+    # 3. Higher close than 2 prev candles
     if len(h4_candles) < 20:
         return False
     curr = h4_candles[-1]
     prev = h4_candles[-2]
+    prev2 = h4_candles[-3]
     if curr['close'] <= curr['open']:
         return False
     rng  = curr['high'] - curr['low']
@@ -282,15 +322,17 @@ def h4_bullish_confirmation(h4_candles):
     body = abs(curr['close'] - curr['open'])
     close_pos = (curr['close'] - curr['low']) / rng
 
-    return (body >= rng * 0.55 and
-            close_pos >= 0.65 and
-            curr['close'] > prev['close'])
+    return (body >= rng * 0.65 and
+            close_pos >= 0.75 and
+            curr['close'] > prev['close'] and
+            curr['close'] > prev2['close'])
 
 def h4_bearish_confirmation(h4_candles):
     if len(h4_candles) < 20:
         return False
     curr = h4_candles[-1]
     prev = h4_candles[-2]
+    prev2 = h4_candles[-3]
     if curr['close'] >= curr['open']:
         return False
     rng  = curr['high'] - curr['low']
@@ -299,9 +341,10 @@ def h4_bearish_confirmation(h4_candles):
     body = abs(curr['close'] - curr['open'])
     close_pos = (curr['close'] - curr['low']) / rng
 
-    return (body >= rng * 0.55 and
-            close_pos <= 0.35 and
-            curr['close'] < prev['close'])
+    return (body >= rng * 0.65 and
+            close_pos <= 0.25 and
+            curr['close'] < prev['close'] and
+            curr['close'] < prev2['close'])
 
 # ─── RECENT SWING POINTS FOR TP ─────────────────────────────
 def recent_swing_high(candles, lookback=20):
@@ -372,7 +415,7 @@ def backtest_pair(pair, h1_all, h4_all, d_all):
             continue
         # Cooldown: no new signals within 24 H1 bars (1 day) of last signal
         # Forces strategy to wait for fresh setup
-        if i - last_signal_bar < 8:  # 8 hour cooldown
+        if i - last_signal_bar < 24:  # 1 day cooldown - prevents clustered losses
             continue
 
         candle_time = h1_all[i]['time']
