@@ -144,15 +144,16 @@ def simulate_day(entry, buy_tp, buy_sl, sell_tp, sell_sl, future_candles, expire
                 buy_active      = False  # Cancel other leg
 
     # Expire any still-active legs at close
+    last_close = future_candles[-1]['close'] if future_candles else entry
     if buy_active:
-        last_close = future_candles[-1]['close'] if future_candles else entry
-        buy_result = 'EXPIRED'
+        buy_result     = 'EXPIRED'
         buy_exit_price = last_close
+        buy_pips_exp   = to_pips(last_close - entry, pair)
 
     if sell_active:
-        last_close = future_candles[-1]['close'] if future_candles else entry
-        sell_result = 'EXPIRED'
+        sell_result     = 'EXPIRED'
         sell_exit_price = last_close
+        sell_pips_exp   = to_pips(entry - last_close, pair)
 
     # ── Calculate net pips for the day ──────────────────────
     buy_pips  = 0
@@ -163,14 +164,14 @@ def simulate_day(entry, buy_tp, buy_sl, sell_tp, sell_sl, future_candles, expire
     elif buy_result == 'SL':
         buy_pips = -to_pips(entry - buy_sl, pair)
     elif buy_result == 'EXPIRED':
-        buy_pips = to_pips(buy_exit_price - entry, pair)
+        buy_pips = to_pips((buy_exit_price or entry) - entry, pair)
 
     if sell_result == 'TP':
         sell_pips = to_pips(entry - sell_tp, pair)
     elif sell_result == 'SL':
         sell_pips = -to_pips(sell_sl - entry, pair)
     elif sell_result == 'EXPIRED':
-        sell_pips = to_pips(entry - sell_exit_price, pair)
+        sell_pips = to_pips(entry - (sell_exit_price or entry), pair)
 
     net_pips = round(buy_pips + sell_pips, 1)
 
@@ -289,8 +290,9 @@ def print_results(all_trades):
     tot_pip  = round(sum(t['pips'] for t in all_trades), 1)
     avg_win  = round(sum(t['pips'] for t in wins) / len(wins), 1) if wins else 0
     avg_dsl  = round(sum(t['pips'] for t in double_sls) / len(double_sls), 1) if double_sls else 0
-    gw       = sum(t['pips'] for t in wins)
-    gl       = abs(sum(t['pips'] for t in double_sls))
+    gw       = max(sum(t['pips'] for t in wins), 0)
+    gl_raw   = sum(t['pips'] for t in double_sls)
+    gl       = abs(gl_raw) if gl_raw < 0 else 1
     pf       = round(gw / gl, 2) if gl > 0 else 0
 
     max_cl = cl = 0
@@ -428,7 +430,12 @@ def main():
         except Exception as e:
             print('  ERROR: ' + str(e))
 
-    print_results(all_trades)
+    try:
+        print_results(all_trades)
+    except Exception as e:
+        print('ERROR in print_results: ' + str(e))
+        import traceback
+        traceback.print_exc()
 
 if __name__ == '__main__':
     main()
