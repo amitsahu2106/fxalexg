@@ -1,3 +1,19 @@
 {
-  "_ict_last_alert": 1779454890.724705
+  "_ict_last_alert": 1779696080.0901022,
+  "EUR_USD_2026-05-25_08:00": {
+    "pair": "EUR_USD",
+    "trade_key": "EUR_USD_2026-05-25_08:00",
+    "direction": "SELL",
+    "entry": 1.16374,
+    "sl": 1.16534,
+    "tp1": 1.16214,
+    "tp2": 1.11784,
+    "tp3": 1.1164,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 1.16372,
+    "aoi_bottom": 1.15802,
+    "opened_at": "2026-05-25 08:00 UTC",
+    "opened_ts": 1779696056.785652
+  }
 }
