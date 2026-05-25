@@ -847,6 +847,54 @@ def calc_atr(candles, period=14):
         trs.append(tr)
     return sum(trs[-period:]) / period
 
+# ─── GOLD 2R STRATEGY HELPERS ────────────────────────────────
+def ema_series(values, period):
+    if len(values) < period:
+        return []
+    m      = 2.0 / (period + 1)
+    result = [None] * (period - 1)
+    val    = sum(values[:period]) / period
+    result.append(val)
+    for p in values[period:]:
+        val = (p - val) * m + val
+        result.append(val)
+    return result
+
+def macd_histogram(values, fast=12, slow=26, signal=9):
+    # Returns MACD histogram series
+    ema_fast = ema_series(values, fast)
+    ema_slow = ema_series(values, slow)
+    if not ema_fast or not ema_slow:
+        return []
+
+    macd_line = []
+    for i in range(len(values)):
+        f = ema_fast[i]
+        s = ema_slow[i]
+        if f is None or s is None:
+            macd_line.append(None)
+        else:
+            macd_line.append(f - s)
+
+    valid_indices = [i for i, v in enumerate(macd_line) if v is not None]
+    valid_macd    = [macd_line[i] for i in valid_indices]
+    signal_vals   = ema_series(valid_macd, signal)
+    signal_series = [None] * len(values)
+    for idx, vi in enumerate(valid_indices):
+        if idx < len(signal_vals) and signal_vals[idx] is not None:
+            signal_series[vi] = signal_vals[idx]
+
+    hist_series = []
+    for i in range(len(values)):
+        m_val = macd_line[i]
+        s_val = signal_series[i]
+        if m_val is None or s_val is None:
+            hist_series.append(None)
+        else:
+            hist_series.append(m_val - s_val)
+    return hist_series
+
+
 def calc_sl_tp(direction, price, aoi_zone, pair, all_aois, candles=None):
     # TP1 = 1R (entry +/- risk)
     # TP2 = mid of first AOI beyond TP1 (was old TP1)
@@ -966,7 +1014,16 @@ def check_active_trades():
         tp3_hit       = ((direction == 'BUY'  and price >= tp3) or
                          (direction == 'SELL' and price <= tp3))
 
-        header = pair.replace('_', '/') + ' ' + direction + ' [' + opened_at + ']' + NL
+        strategy = trade.get('strategy', 'FXALEXG')
+        if strategy == 'GOLD_2R':
+            strategy_label = 'Gold 2R Strategy'
+        elif strategy == 'ALL_PAIRS_15R':
+            strategy_label = 'All Pairs 1.5R Strategy'
+        else:
+            strategy_label = 'FXAlexG Strategy'
+        header = (strategy_label + NL +
+                  pair.replace('_', '/') + ' ' + direction +
+                  ' [' + opened_at + ']' + NL)
 
         if tp3_hit:
             send_telegram('TP3 HIT - MAX TARGET ' + NL + header +
@@ -990,6 +1047,10 @@ def check_active_trades():
             print('  SL/BE hit - removed: ' + trade_key)
 
         elif tp2_newly_hit:
+            trades = load_trades()
+            if trade_key in trades:
+                trades[trade_key]['tp2_hit'] = True
+                save_trades(trades)
             trades = load_trades()
             if trade_key in trades:
                 trades[trade_key]['tp2_hit'] = True
@@ -1241,6 +1302,518 @@ def analyse_fxalexg(pair):
 # ─────────────────────────────────────────────
 # STRATEGY 2 - ICT KILLZONE ANALYSER (XAU/USD)
 # ─────────────────────────────────────────────
+
+# ═══════════════════════════════════════════════════════════════
+# GOLD 2R STRATEGY: EMA200 + MACD Pullback + ATR Stop (M15)
+# ═══════════════════════════════════════════════════════════════
+def analyse_gold_2r():
+    pair = 'XAU_USD'
+    print(chr(10) + '[Gold 2R Strategy] XAU/USD')
+
+    # ── Fetch candles across timeframes ─────────────────────
+    d_candles  = fetch_candles(pair, 'D',  count=80)
+    h4_candles = fetch_candles(pair, 'H4', count=120)
+    h1_candles = fetch_candles(pair, 'H1', count=120)
+
+    if not d_candles or len(d_candles) < 60:
+        print('     Not enough Daily data')
+        return
+    if not h4_candles or len(h4_candles) < 60:
+        print('     Not enough H4 data')
+        return
+    if not h1_candles or len(h1_candles) < 30:
+        print('     Not enough H1 data')
+        return
+
+    # ── Step 1: Daily trend via 50 EMA slope ────────────────
+    d_closes  = [c['close'] for c in d_candles]
+    ema50_now = ema50(d_candles)          # reuse existing ema50 helper
+    if not ema50_now:
+        print('     EMA50 not ready')
+        return
+
+    # Slope: compare EMA now vs 10 days ago
+    ema50_10ago = None
+    if len(d_closes) >= 60:
+        past_closes  = d_closes[:-10]
+        ema50_10ago  = sum(past_closes[-50:]) / 50
+        m = 2.0 / 51
+        for p in past_closes[-50:]:
+            ema50_10ago = (p - ema50_10ago) * m + ema50_10ago
+
+    price_d = d_candles[-1]['close']
+    trend_dir = None
+
+    if ema50_10ago:
+        slope_pct = (ema50_now - ema50_10ago) / ema50_10ago * 100
+        if price_d > ema50_now and slope_pct > 0.1:
+            trend_dir = 'BUY'
+        elif price_d < ema50_now and slope_pct < -0.1:
+            trend_dir = 'SELL'
+
+    if not trend_dir:
+        print('     No clear daily trend - skip')
+        return
+
+    print('     Daily trend: ' + trend_dir + ' | EMA50: ' + str(round(ema50_now, 2)))
+
+    # ── Step 2: H4 pullback to 50 EMA ───────────────────────
+    h4_closes = [c['close'] for c in h4_candles]
+    h4_ema50  = None
+    if len(h4_closes) >= 50:
+        h4_ema50 = sum(h4_closes[:50]) / 50
+        m = 2.0 / 51
+        for p in h4_closes[50:]:
+            h4_ema50 = (p - h4_ema50) * m + h4_ema50
+
+    if not h4_ema50:
+        print('     H4 EMA50 not ready')
+        return
+
+    h4_atr_val = calc_atr(h4_candles[-20:], 14)
+    if not h4_atr_val:
+        print('     H4 ATR not ready')
+        return
+
+    # Check if price has pulled back to H4 EMA50 in last 10 candles
+    last_10_h4 = h4_candles[-10:]
+    curr_h4    = h4_candles[-1]
+    pullback_valid = False
+
+    if trend_dir == 'BUY':
+        tagged   = any(c['low'] <= h4_ema50 + h4_atr_val * 0.5 for c in last_10_h4)
+        rejected = curr_h4['close'] > h4_ema50
+        pullback_valid = tagged and rejected
+    else:
+        tagged   = any(c['high'] >= h4_ema50 - h4_atr_val * 0.5 for c in last_10_h4)
+        rejected = curr_h4['close'] < h4_ema50
+        pullback_valid = tagged and rejected
+
+    if not pullback_valid:
+        print('     No H4 pullback to EMA50 - skip')
+        return
+
+    print('     H4 pullback confirmed | H4 EMA50: ' + str(round(h4_ema50, 2)))
+
+    # ── Step 3: H1 entry confirmation ───────────────────────
+    curr_h1  = h1_candles[-1]
+    prev_h1  = h1_candles[-2]
+    prev2_h1 = h1_candles[-3]
+    h1_closes = [c['close'] for c in h1_candles]
+
+    # H1 RSI
+    h1_rsi_val = None
+    if len(h1_closes) >= 15:
+        gains = losses = 0
+        for j in range(1, 15):
+            ch = h1_closes[j] - h1_closes[j-1]
+            if ch > 0: gains += ch
+            else: losses -= ch
+        ag = gains / 14
+        al = losses / 14
+        for j in range(15, len(h1_closes)):
+            ch  = h1_closes[j] - h1_closes[j-1]
+            g   = max(ch, 0)
+            l   = max(-ch, 0)
+            ag  = (ag * 13 + g) / 14
+            al  = (al * 13 + l) / 14
+        h1_rsi_val = 100 - (100 / (1 + ag / al)) if al > 0 else 100
+
+    # H1 EMA20
+    h1_ema20_val = None
+    if len(h1_closes) >= 20:
+        h1_ema20_val = sum(h1_closes[:20]) / 20
+        m = 2.0 / 21
+        for p in h1_closes[20:]:
+            h1_ema20_val = (p - h1_ema20_val) * m + h1_ema20_val
+
+    entry_confirmed = False
+    if trend_dir == 'BUY':
+        rng       = curr_h1['high'] - curr_h1['low']
+        body      = curr_h1['close'] - curr_h1['open']
+        close_pos = (curr_h1['close'] - curr_h1['low']) / rng if rng > 0 else 0
+        if (curr_h1['close'] > curr_h1['open'] and
+                body >= rng * 0.55 and
+                close_pos >= 0.65 and
+                curr_h1['close'] > prev_h1['close'] and
+                (h1_rsi_val is None or 35 <= h1_rsi_val <= 65) and
+                (h1_ema20_val is None or curr_h1['close'] > h1_ema20_val)):
+            entry_confirmed = True
+    else:
+        rng       = curr_h1['high'] - curr_h1['low']
+        body      = curr_h1['open'] - curr_h1['close']
+        close_pos = (curr_h1['close'] - curr_h1['low']) / rng if rng > 0 else 0
+        if (curr_h1['close'] < curr_h1['open'] and
+                body >= rng * 0.55 and
+                close_pos <= 0.35 and
+                curr_h1['close'] < prev_h1['close'] and
+                (h1_rsi_val is None or 35 <= h1_rsi_val <= 65) and
+                (h1_ema20_val is None or curr_h1['close'] < h1_ema20_val)):
+            entry_confirmed = True
+
+    if not entry_confirmed:
+        print('     No H1 confirmation candle - skip')
+        return
+
+    print('     H1 entry confirmed | RSI: ' + str(round(h1_rsi_val, 1) if h1_rsi_val else 0))
+
+    # ── Check for existing Gold 2R trades (24h OR TP1 rule) ─────
+    active_trades = load_trades()
+    gold_trades   = {k: v for k, v in active_trades.items()
+                     if not k.startswith('_') and v.get('strategy') == 'GOLD_2R'}
+
+    if gold_trades:
+        now_ts         = datetime.now(timezone.utc).timestamp()
+        any_tp1_hit    = any(t.get('tp1_hit', False) for t in gold_trades.values())
+        most_recent_ts = max(t.get('opened_ts', 0) for t in gold_trades.values())
+        hours_since    = (now_ts - most_recent_ts) / 3600
+        if not any_tp1_hit and hours_since < 24:
+            print('     Skipped - ' + str(round(hours_since, 1)) + 'h since last signal, no TP1 yet')
+            return
+        elif any_tp1_hit:
+            print('     TP1 already hit - new signal allowed')
+        else:
+            print('     24h passed - new signal allowed')
+
+    # ── Step 4: Calculate SL and TPs ────────────────────────
+    price = curr_h1['close']
+
+    if trend_dir == 'BUY':
+        recent_low = min(c['low'] for c in h1_candles[-20:])
+        sl_struct  = recent_low - from_pips(5, pair)
+        sl_atr     = price - h4_atr_val * 1.5
+        sl         = min(sl_struct, sl_atr)
+        risk       = price - sl
+    else:
+        recent_high = max(c['high'] for c in h1_candles[-20:])
+        sl_struct   = recent_high + from_pips(5, pair)
+        sl_atr      = price + h4_atr_val * 1.5
+        sl          = max(sl_struct, sl_atr)
+        risk        = sl - price
+
+    if risk <= 0:
+        print('     Invalid risk')
+        return
+
+    risk_pips = round(risk / pip_size(pair), 1)
+    if risk_pips < 10 or risk_pips > 200:
+        print('     Risk out of range: ' + str(risk_pips) + ' pips')
+        return
+
+    # TP1=2R | TP2=3R | TP3=4R
+    if trend_dir == 'BUY':
+        tp1 = price + risk * 2.0
+        tp2 = price + risk * 3.0
+        tp3 = price + risk * 4.0
+    else:
+        tp1 = price - risk * 2.0
+        tp2 = price - risk * 3.0
+        tp3 = price - risk * 4.0
+
+    # ── Send Telegram alert ─────────────────────────────────
+    now       = datetime.now(timezone.utc)
+    NL        = chr(10)
+    pair_disp = pair.replace('_', '/')
+
+    msg = (
+        '<b>Gold 2R Strategy Alert</b>' + NL +
+        '<b>' + pair_disp + ' ' + trend_dir + '</b>' + NL + NL +
+        'Time: ' + now.strftime('%H:%M UTC') + NL +
+        'Entry: <code>' + str(round(price, 2)) + '</code>' + NL +
+        'SL:  <code>' + str(round(sl, 2)) + '</code> (' + str(risk_pips) + ' pips)' + NL +
+        'TP1: <code>' + str(round(tp1, 2)) + '</code> (2R)' + NL +
+        'TP2: <code>' + str(round(tp2, 2)) + '</code> (3R)' + NL +
+        'TP3: <code>' + str(round(tp3, 2)) + '</code> (4R)' + NL + NL +
+        '<b>Setup:</b>' + NL +
+        'Daily trend: ' + trend_dir + ' (above EMA50)' + NL +
+        'H4 pullback to EMA50: confirmed' + NL +
+        'H1 entry candle: confirmed' + NL +
+        'RSI: ' + str(round(h1_rsi_val, 1) if h1_rsi_val else 0)
+    )
+    send_telegram(msg)
+
+    # ── Save trade ───────────────────────────────────────────
+    trade_key = 'GOLD2R_' + pair + '_' + now.strftime('%Y-%m-%d_%H:%M')
+    trades    = load_trades()
+    trades[trade_key] = {
+        'pair':       pair,
+        'strategy':   'GOLD_2R',
+        'trade_key':  trade_key,
+        'direction':  trend_dir,
+        'entry':      round(price, 2),
+        'sl':         round(sl, 2),
+        'tp1':        round(tp1, 2),
+        'tp2':        round(tp2, 2),
+        'tp3':        round(tp3, 2),
+        'tp1_hit':    False,
+        'tp2_hit':    False,
+        'aoi_top':    None,
+        'aoi_bottom': None,
+        'opened_at':  now.strftime('%Y-%m-%d %H:%M UTC'),
+        'opened_ts':  now.timestamp(),
+    }
+    save_trades(trades)
+    print('     Gold 2R alert sent: ' + trade_key)
+
+
+# ═══════════════════════════════════════════════════════════════
+# ALL PAIRS 1.5R STRATEGY: Trend + Pullback Hybrid
+# Daily 50 EMA trend + H4 pullback + H1/H4 entry
+# TP1=1.5R | TP2=2.5R | TP3=3.5R
+# Same 24h OR TP1 signal blocking as FXAlexG
+# ═══════════════════════════════════════════════════════════════
+def analyse_all_pairs_15r(pair):
+    print(chr(10) + '[All Pairs 1.5R] ' + pair.replace('_', '/'))
+
+    # ── Fetch candles ────────────────────────────────────────
+    d_candles  = fetch_candles(pair, 'D',  count=80)
+    h4_candles = fetch_candles(pair, 'H4', count=120)
+    h1_candles = fetch_candles(pair, 'H1', count=120)
+
+    if not d_candles or len(d_candles) < 60:
+        print('     Not enough Daily data')
+        return
+    if not h4_candles or len(h4_candles) < 60:
+        print('     Not enough H4 data')
+        return
+    if not h1_candles or len(h1_candles) < 30:
+        print('     Not enough H1 data')
+        return
+
+    # ── Step 1: Daily trend via 50 EMA + slope ───────────────
+    d_closes = [c['close'] for c in d_candles]
+
+    # EMA50 now
+    m = 2.0 / 51
+    ema50_val = sum(d_closes[:50]) / 50
+    for p in d_closes[50:]:
+        ema50_val = (p - ema50_val) * m + ema50_val
+
+    # EMA50 10 days ago
+    past_closes  = d_closes[:-10]
+    ema50_10ago  = sum(past_closes[-50:]) / 50
+    for p in past_closes[-50:]:
+        ema50_10ago = (p - ema50_10ago) * m + ema50_10ago
+
+    price_d   = d_candles[-1]['close']
+    slope_pct = (ema50_val - ema50_10ago) / ema50_10ago * 100
+
+    trend_dir = None
+    if price_d > ema50_val and slope_pct > 0.1:
+        trend_dir = 'BUY'
+    elif price_d < ema50_val and slope_pct < -0.1:
+        trend_dir = 'SELL'
+
+    if not trend_dir:
+        print('     No clear daily trend (slope: ' + str(round(slope_pct, 3)) + '%) - skip')
+        return
+
+    print('     Daily ' + trend_dir + ' | EMA50: ' + str(round(ema50_val, 5)) +
+          ' | Slope: ' + str(round(slope_pct, 3)) + '%')
+
+    # ── Step 2: H4 pullback to 50 EMA ───────────────────────
+    h4_closes = [c['close'] for c in h4_candles]
+    h4_ema50  = sum(h4_closes[:50]) / 50
+    for p in h4_closes[50:]:
+        h4_ema50 = (p - h4_ema50) * m + h4_ema50
+
+    h4_atr_val = calc_atr(h4_candles[-20:], 14)
+    if not h4_atr_val:
+        print('     H4 ATR not ready')
+        return
+
+    last_10_h4 = h4_candles[-10:]
+    curr_h4    = h4_candles[-1]
+
+    if trend_dir == 'BUY':
+        tagged   = any(c['low'] <= h4_ema50 + h4_atr_val * 0.5 for c in last_10_h4)
+        rejected = curr_h4['close'] > h4_ema50
+    else:
+        tagged   = any(c['high'] >= h4_ema50 - h4_atr_val * 0.5 for c in last_10_h4)
+        rejected = curr_h4['close'] < h4_ema50
+
+    if not (tagged and rejected):
+        print('     No H4 pullback to EMA50 - skip')
+        return
+
+    print('     H4 pullback confirmed | EMA50: ' + str(round(h4_ema50, 5)))
+
+    # ── Step 3: H4 or H1 entry confirmation ─────────────────
+    # Try H4 first (higher conviction), fall back to H1
+    curr_h4  = h4_candles[-1]
+    prev_h4  = h4_candles[-2]
+    prev2_h4 = h4_candles[-3]
+    curr_h1  = h1_candles[-1]
+    prev_h1  = h1_candles[-2]
+
+    entry_tf = None
+    h1_closes = [c['close'] for c in h1_candles]
+
+    # H1 RSI
+    h1_rsi_val = None
+    if len(h1_closes) >= 15:
+        gains = losses = 0
+        for j in range(1, 15):
+            ch = h1_closes[j] - h1_closes[j-1]
+            if ch > 0: gains += ch
+            else: losses -= ch
+        ag = gains / 14
+        al = losses / 14
+        for j in range(15, len(h1_closes)):
+            ch = h1_closes[j] - h1_closes[j-1]
+            g  = max(ch, 0)
+            l  = max(-ch, 0)
+            ag = (ag * 13 + g) / 14
+            al = (al * 13 + l) / 14
+        h1_rsi_val = (100 - (100 / (1 + ag / al))) if al > 0 else 100
+
+    # H1 EMA20
+    h1_ema20_val = None
+    if len(h1_closes) >= 20:
+        h1_ema20_val = sum(h1_closes[:20]) / 20
+        m20 = 2.0 / 21
+        for p in h1_closes[20:]:
+            h1_ema20_val = (p - h1_ema20_val) * m20 + h1_ema20_val
+
+    def check_h4_entry(c, p, p2, direction):
+        rng = c['high'] - c['low']
+        if rng <= 0: return False
+        body = abs(c['close'] - c['open'])
+        cp   = (c['close'] - c['low']) / rng
+        if direction == 'BUY':
+            return (c['close'] > c['open'] and body >= rng * 0.55 and
+                    cp >= 0.65 and c['close'] > p['close'] and c['close'] > p2['close'])
+        else:
+            return (c['close'] < c['open'] and body >= rng * 0.55 and
+                    cp <= 0.35 and c['close'] < p['close'] and c['close'] < p2['close'])
+
+    def check_h1_entry(c, p, rsi_val, ema20_val, direction):
+        rng = c['high'] - c['low']
+        if rng <= 0: return False
+        body = abs(c['close'] - c['open'])
+        cp   = (c['close'] - c['low']) / rng
+        rsi_ok = rsi_val is None or (35 <= rsi_val <= 65)
+        if direction == 'BUY':
+            ema_ok = ema20_val is None or c['close'] > ema20_val
+            return (c['close'] > c['open'] and body >= rng * 0.55 and
+                    cp >= 0.65 and c['close'] > p['close'] and rsi_ok and ema_ok)
+        else:
+            ema_ok = ema20_val is None or c['close'] < ema20_val
+            return (c['close'] < c['open'] and body >= rng * 0.55 and
+                    cp <= 0.35 and c['close'] < p['close'] and rsi_ok and ema_ok)
+
+    if check_h4_entry(curr_h4, prev_h4, prev2_h4, trend_dir):
+        entry_tf = 'H4'
+    elif check_h1_entry(curr_h1, prev_h1, h1_rsi_val, h1_ema20_val, trend_dir):
+        entry_tf = 'H1'
+
+    if not entry_tf:
+        print('     No H4/H1 confirmation - skip')
+        return
+
+    print('     Entry confirmed on ' + entry_tf +
+          ' | RSI: ' + str(round(h1_rsi_val, 1) if h1_rsi_val else 0))
+
+    # ── Check new signal blocking (24h OR TP1 hit) ───────────
+    active_trades = load_trades()
+    pair_trades   = {k: v for k, v in active_trades.items()
+                     if not k.startswith('_') and v.get('strategy') == 'ALL_PAIRS_15R'
+                     and v.get('pair') == pair}
+
+    if pair_trades:
+        now_ts         = datetime.now(timezone.utc).timestamp()
+        any_tp1_hit    = any(t.get('tp1_hit', False) for t in pair_trades.values())
+        most_recent_ts = max(t.get('opened_ts', 0) for t in pair_trades.values())
+        hours_since    = (now_ts - most_recent_ts) / 3600
+        if not any_tp1_hit and hours_since < 24:
+            print('     Skipped - ' + str(round(hours_since, 1)) + 'h since last signal, no TP1 yet')
+            return
+        elif any_tp1_hit:
+            print('     TP1 hit - new signal allowed')
+        else:
+            print('     24h passed - new signal allowed')
+
+    # ── Calculate SL and TPs ────────────────────────────────
+    price = curr_h1['close']
+
+    if trend_dir == 'BUY':
+        recent_low = min(c['low'] for c in h1_candles[-20:])
+        sl_struct  = recent_low - from_pips(3, pair)
+        sl_atr     = price - h4_atr_val * 1.5
+        sl         = min(sl_struct, sl_atr)
+        risk       = price - sl
+    else:
+        recent_high = max(c['high'] for c in h1_candles[-20:])
+        sl_struct   = recent_high + from_pips(3, pair)
+        sl_atr      = price + h4_atr_val * 1.5
+        sl          = max(sl_struct, sl_atr)
+        risk        = sl - price
+
+    if risk <= 0:
+        print('     Invalid risk')
+        return
+
+    risk_pips = to_pips(risk, pair)
+    if risk_pips < 5 or risk_pips > 200:
+        print('     Risk out of range: ' + str(risk_pips) + ' pips')
+        return
+
+    # TP1=1.5R | TP2=2.5R | TP3=3.5R
+    if trend_dir == 'BUY':
+        tp1 = price + risk * 1.5
+        tp2 = price + risk * 2.5
+        tp3 = price + risk * 3.5
+    else:
+        tp1 = price - risk * 1.5
+        tp2 = price - risk * 2.5
+        tp3 = price - risk * 3.5
+
+    # ── Send Telegram alert ─────────────────────────────────
+    now       = datetime.now(timezone.utc)
+    NL        = chr(10)
+    pair_disp = pair.replace('_', '/')
+
+    msg = (
+        '<b>All Pairs 1.5R Strategy Alert</b>' + NL +
+        '<b>' + pair_disp + ' ' + trend_dir + '</b>' + NL + NL +
+        'Time: ' + now.strftime('%H:%M UTC') + NL +
+        'Entry: <code>' + str(round(price, 5)) + '</code>' + NL +
+        'SL:  <code>' + str(round(sl, 5)) + '</code> (' + str(risk_pips) + ' pips)' + NL +
+        'TP1: <code>' + str(round(tp1, 5)) + '</code> (1.5R)' + NL +
+        'TP2: <code>' + str(round(tp2, 5)) + '</code> (2.5R)' + NL +
+        'TP3: <code>' + str(round(tp3, 5)) + '</code> (3.5R)' + NL + NL +
+        '<b>Setup:</b>' + NL +
+        'Daily trend: ' + trend_dir + NL +
+        'H4 pullback to EMA50: confirmed' + NL +
+        'Entry TF: ' + entry_tf + NL +
+        'RSI: ' + str(round(h1_rsi_val, 1) if h1_rsi_val else 0)
+    )
+    send_telegram(msg)
+
+    # ── Save trade ───────────────────────────────────────────
+    trade_key = 'AP15R_' + pair + '_' + now.strftime('%Y-%m-%d_%H:%M')
+    trades    = load_trades()
+    trades[trade_key] = {
+        'pair':       pair,
+        'strategy':   'ALL_PAIRS_15R',
+        'trade_key':  trade_key,
+        'direction':  trend_dir,
+        'entry':      round(price, 5),
+        'sl':         round(sl, 5),
+        'tp1':        round(tp1, 5),
+        'tp2':        round(tp2, 5),
+        'tp3':        round(tp3, 5),
+        'tp1_hit':    False,
+        'tp2_hit':    False,
+        'aoi_top':    None,
+        'aoi_bottom': None,
+        'opened_at':  now.strftime('%Y-%m-%d %H:%M UTC'),
+        'opened_ts':  now.timestamp(),
+    }
+    save_trades(trades)
+    print('     Alert sent: ' + trade_key)
+
+
 def analyse_ict_gold():
     print("  [ICT Killzone] XAU_USD")
     now_utc  = datetime.now(timezone.utc)
@@ -1420,6 +1993,20 @@ def main():
         analyse_ict_gold()
     except Exception as e:
         print("  ERROR ICT: " + str(e))
+
+    print("\n--- Strategy 3: Gold 2R (XAU/USD) ---")
+    try:
+        analyse_gold_2r()
+    except Exception as e:
+        print("  ERROR Gold 2R: " + str(e))
+
+    print("\n--- Strategy 4: All Pairs 1.5R (All 9 Pairs) ---")
+    for pair in PAIRS:
+        try:
+            analyse_all_pairs_15r(pair)
+            time.sleep(1)
+        except Exception as e:
+            print("  ERROR AP15R " + pair + ": " + str(e))
 
     print("\nScan complete.")
 
