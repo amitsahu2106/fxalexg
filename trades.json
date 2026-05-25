@@ -31,5 +31,21 @@
     "aoi_bottom": 0.58162,
     "opened_at": "2026-05-25 10:00 UTC",
     "opened_ts": 1779703259.907212
+  },
+  "USD_CHF_2026-05-25_17:01": {
+    "pair": "USD_CHF",
+    "trade_key": "USD_CHF_2026-05-25_17:01",
+    "direction": "SELL",
+    "entry": 0.78303,
+    "sl": 0.78794,
+    "tp1": 0.77812,
+    "tp2": 0.77321,
+    "tp3": 0.7683,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.78685,
+    "aoi_bottom": 0.78289,
+    "opened_at": "2026-05-25 17:01 UTC",
+    "opened_ts": 1779728482.451466
   }
 }
