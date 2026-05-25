@@ -1,13 +1,17 @@
 # ═══════════════════════════════════════════════════════════════
-# STRATEGY S3: 50 PIPS A DAY
-# At 07:00 UTC H1 candle close, place two orders simultaneously:
-#   BUY:  TP = close + 50 pips | SL = close - 10 pips
-#   SELL: TP = close - 50 pips | SL = close + 10 pips
-# Whichever side moves 50 pips first = WIN on that leg
-# The other leg gets stopped for -10 pips
-# If price moves against BOTH before hitting 50 pips = both SL
-# Trade expires at 20:00 UTC same day (London/NY session end)
-# Results: Win (TP50 - SL10 = +40 net) | Loss (both SL = -20)
+# STRATEGY S4: 15-MIN OPENING RANGE BREAKOUT (ORB)
+# Proven strategy with 55-60% WR at 1:1 RR
+# 
+# Rules:
+# 1. Wait for first 15-min M15 candle of London session (08:00 UTC)
+# 2. Mark the HIGH and LOW of that candle = "Opening Range"
+# 3. When price closes ABOVE the range high → BUY entry
+#    When price closes BELOW the range low → SELL entry
+# 4. SL = Opposite side of opening range
+# 5. TP = Same size as range (1:1 RR)
+# 6. Only one trade per day, only first breakout
+# 7. Expire at 16:00 UTC if neither side hits
+# 
 # 2 Years from Jan 2024
 # ═══════════════════════════════════════════════════════════════
 import requests, os, time
@@ -22,6 +26,12 @@ PAIRS = [
     'EUR_USD', 'GBP_USD', 'USD_JPY', 'AUD_USD',
     'USD_CHF', 'NZD_USD', 'USD_CAD', 'XAU_USD'
 ]
+
+# London session opens at 08:00 UTC
+SESSION_OPEN_HOUR = 8
+EXPIRY_HOUR       = 16
+MIN_RANGE_PIPS    = 8   # Skip dead days
+MAX_RANGE_PIPS    = 60  # Skip news spikes
 
 # ─── PIP HELPERS ─────────────────────────────────────────────
 def pip_size(pair):
@@ -91,164 +101,158 @@ def fetch_2years(pair, granularity):
             unique.append(c)
     return sorted(unique, key=lambda x: x['time'])
 
-# ─── SIMULATE BOTH ORDERS FOR ONE DAY ───────────────────────
-def simulate_day(entry, buy_tp, buy_sl, sell_tp, sell_sl, future_candles, expire_time, pair):
-    # Walk candle by candle
-    # Track status of both legs simultaneously
-    # First leg to hit TP cancels the opposite leg's TP
-    # (but the other leg's SL may still get hit - OCO means SAME direction only)
-    # Actually: both orders are live independently
-    # If BUY hits TP50 first = BUY wins (+50p), SELL still live but cancel it now
-    # If SELL hits TP50 first = SELL wins (+50p), BUY still live but cancel it now
-    # Both can hit SL if price is choppy (ranging market)
-
-    buy_active  = True
-    sell_active = True
-    buy_result  = None
-    sell_result = None
-    buy_exit_price  = None
-    sell_exit_price = None
-
-    for c in future_candles:
-        # Stop scanning after expiry time
-        c_time = datetime.strptime(c['time'][:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
-        if c_time >= expire_time:
-            break
-
-        high  = c['high']
-        low   = c['low']
-        close = c['close']
-
-        # Check BUY leg
-        if buy_active:
-            if low <= buy_sl:
-                buy_result     = 'SL'
-                buy_exit_price = buy_sl
-                buy_active     = False
-            elif high >= buy_tp:
-                buy_result     = 'TP'
-                buy_exit_price = buy_tp
-                buy_active     = False
-                sell_active    = False  # Cancel other leg on first TP hit
-
-        # Check SELL leg
-        if sell_active:
-            if high >= sell_sl:
-                sell_result     = 'SL'
-                sell_exit_price = sell_sl
-                sell_active     = False
-            elif low <= sell_tp:
-                sell_result     = 'TP'
-                sell_exit_price = sell_tp
-                sell_active     = False
-                buy_active      = False  # Cancel other leg
-
-    # Expire any still-active legs at close
-    last_close = future_candles[-1]['close'] if future_candles else entry
-    if buy_active:
-        buy_result     = 'EXPIRED'
-        buy_exit_price = last_close
-        buy_pips_exp   = to_pips(last_close - entry, pair)
-
-    if sell_active:
-        sell_result     = 'EXPIRED'
-        sell_exit_price = last_close
-        sell_pips_exp   = to_pips(entry - last_close, pair)
-
-    # ── Calculate net pips for the day ──────────────────────
-    buy_pips  = 0
-    sell_pips = 0
-
-    if buy_result == 'TP':
-        buy_pips = to_pips(buy_tp - entry, pair)
-    elif buy_result == 'SL':
-        buy_pips = -to_pips(entry - buy_sl, pair)
-    elif buy_result == 'EXPIRED':
-        buy_pips = to_pips((buy_exit_price or entry) - entry, pair)
-
-    if sell_result == 'TP':
-        sell_pips = to_pips(entry - sell_tp, pair)
-    elif sell_result == 'SL':
-        sell_pips = -to_pips(sell_sl - entry, pair)
-    elif sell_result == 'EXPIRED':
-        sell_pips = to_pips(entry - (sell_exit_price or entry), pair)
-
-    net_pips = round(buy_pips + sell_pips, 1)
-
-    # Determine overall day result
-    if buy_result == 'TP' or sell_result == 'TP':
-        if buy_result == 'SL' or sell_result == 'SL':
-            day_result = 'WIN_SL'   # One TP + one SL = net +40p normally
-        else:
-            day_result = 'WIN'      # TP hit, other cancelled (best case)
-    elif buy_result == 'EXPIRED' or sell_result == 'EXPIRED':
-        day_result = 'EXPIRED'
-    else:
-        day_result = 'DOUBLE_SL'    # Both stopped out = worst case
-
-    return day_result, net_pips, buy_result, sell_result, buy_pips, sell_pips
-
 # ─── BACKTEST ONE PAIR ──────────────────────────────────────
-def backtest_pair(pair, h1_all):
+def backtest_pair(pair, m15_all):
     print(chr(10) + '  ' + pair.replace('_', '/') + '...')
-    if len(h1_all) < 50:
+    if len(m15_all) < 100:
         return []
 
     trades = []
 
-    for i, candle in enumerate(h1_all):
-        # Find the 07:00 UTC candle
-        c_time = datetime.strptime(candle['time'][:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
+    # Group M15 candles by date
+    by_date = {}
+    for c in m15_all:
+        dt = datetime.strptime(c['time'][:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
+        date_key = dt.strftime('%Y-%m-%d')
+        if date_key not in by_date:
+            by_date[date_key] = []
+        by_date[date_key].append((dt, c))
 
-        # Only trade weekdays at exactly 07:00 UTC
-        if c_time.hour != 7:
+    for date_key in sorted(by_date.keys()):
+        day_candles = by_date[date_key]
+        if not day_candles:
             continue
-        if c_time.weekday() >= 5:  # Skip weekends
+
+        # Skip weekends
+        first_dt = day_candles[0][0]
+        if first_dt.weekday() >= 5:
             continue
 
-        entry    = candle['close']
-        tp_pips  = 50
-        sl_pips  = 10
-
-        buy_tp  = entry + from_pips(tp_pips, pair)
-        buy_sl  = entry - from_pips(sl_pips, pair)
-        sell_tp = entry - from_pips(tp_pips, pair)
-        sell_sl = entry + from_pips(sl_pips, pair)
-
-        # Expiry: 20:00 UTC same day (13 hours of trading window)
-        expire_time = c_time.replace(hour=20, minute=0, second=0)
-
-        # Gather H1 candles from 08:00 to 20:00 that day
-        future_candles = []
-        for j in range(i + 1, min(i + 14, len(h1_all))):
-            fc_time = datetime.strptime(h1_all[j]['time'][:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
-            if fc_time > expire_time:
+        # Find the 08:00 UTC M15 candle (opening range)
+        opening_range = None
+        for dt, c in day_candles:
+            if dt.hour == SESSION_OPEN_HOUR and dt.minute == 0:
+                opening_range = (dt, c)
                 break
-            future_candles.append(h1_all[j])
 
-        if not future_candles:
+        if not opening_range:
             continue
 
-        day_result, net_pips, buy_res, sell_res, buy_pips, sell_pips = simulate_day(
-            entry, buy_tp, buy_sl, sell_tp, sell_sl,
-            future_candles, expire_time, pair
-        )
+        or_dt, or_candle = opening_range
+        range_high = or_candle['high']
+        range_low  = or_candle['low']
+        range_size = range_high - range_low
+        range_pips = to_pips(range_size, pair)
+
+        # Skip if range too small (dead market) or too big (news event)
+        if range_pips < MIN_RANGE_PIPS or range_pips > MAX_RANGE_PIPS:
+            continue
+
+        # Look for breakout candle after 08:00 UTC
+        # Entry on candle CLOSE only (not wick)
+        entered    = False
+        direction  = None
+        entry      = None
+        sl         = None
+        tp         = None
+        entry_time = None
+
+        result     = 'NO_BREAKOUT'
+        exit_time  = None
+        exit_price = None
+
+        for dt, c in day_candles:
+            # Only look after opening range
+            if dt <= or_dt:
+                continue
+            # Stop scanning after expiry
+            if dt.hour >= EXPIRY_HOUR:
+                break
+
+            # Look for first breakout
+            if not entered:
+                if c['close'] > range_high:
+                    entered    = True
+                    direction  = 'BUY'
+                    entry      = c['close']
+                    sl         = range_low
+                    tp         = entry + range_size  # 1:1 RR based on range
+                    entry_time = c['time']
+                elif c['close'] < range_low:
+                    entered    = True
+                    direction  = 'SELL'
+                    entry      = c['close']
+                    sl         = range_high
+                    tp         = entry - range_size
+                    entry_time = c['time']
+                continue
+
+            # Trade is active - check TP/SL on each subsequent candle
+            if direction == 'BUY':
+                if c['low'] <= sl:
+                    result     = 'SL'
+                    exit_time  = c['time']
+                    exit_price = sl
+                    break
+                if c['high'] >= tp:
+                    result     = 'TP'
+                    exit_time  = c['time']
+                    exit_price = tp
+                    break
+            else:
+                if c['high'] >= sl:
+                    result     = 'SL'
+                    exit_time  = c['time']
+                    exit_price = sl
+                    break
+                if c['low'] <= tp:
+                    result     = 'TP'
+                    exit_time  = c['time']
+                    exit_price = tp
+                    break
+
+        # If trade entered but neither TP nor SL hit before expiry
+        if entered and result == 'NO_BREAKOUT':
+            # Close at last candle of day
+            last_candle = day_candles[-1][1]
+            result     = 'EXPIRED'
+            exit_time  = last_candle['time']
+            exit_price = last_candle['close']
+
+        if not entered:
+            continue
+
+        # Calculate pips
+        if direction == 'BUY':
+            if result == 'TP':
+                pips = to_pips(tp - entry, pair)
+            elif result == 'SL':
+                pips = -to_pips(entry - sl, pair)
+            else:  # EXPIRED
+                pips = to_pips(exit_price - entry, pair)
+        else:
+            if result == 'TP':
+                pips = to_pips(entry - tp, pair)
+            elif result == 'SL':
+                pips = -to_pips(sl - entry, pair)
+            else:
+                pips = to_pips(entry - exit_price, pair)
 
         trades.append({
             'pair':       pair,
-            'date':       c_time.strftime('%Y-%m-%d'),
-            'entry_time': candle['time'],
+            'date':       date_key,
+            'or_high':    round(range_high, 5),
+            'or_low':     round(range_low, 5),
+            'or_pips':    range_pips,
+            'direction':  direction,
             'entry':      round(entry, 5),
-            'buy_tp':     round(buy_tp, 5),
-            'buy_sl':     round(buy_sl, 5),
-            'sell_tp':    round(sell_tp, 5),
-            'sell_sl':    round(sell_sl, 5),
-            'buy_result': buy_res,
-            'sell_result':sell_res,
-            'buy_pips':   buy_pips,
-            'sell_pips':  sell_pips,
-            'result':     day_result,
-            'pips':       net_pips,
+            'sl':         round(sl, 5),
+            'tp':         round(tp, 5),
+            'entry_time': entry_time,
+            'result':     result,
+            'exit_time':  exit_time,
+            'exit_price': round(exit_price, 5) if exit_price else None,
+            'pips':       round(pips, 1),
         })
 
     return trades
@@ -269,125 +273,104 @@ def print_results(all_trades):
     NL  = chr(10)
     SEP = '=' * 80
     print(NL + SEP)
-    print('  STRATEGY S3: 50 PIPS A DAY - 2 Years Backtest')
-    print('  Entry: 07:00 UTC H1 close | Expiry: 20:00 UTC')
-    print('  BUY:  TP=+50 pips | SL=-10 pips')
-    print('  SELL: TP=-50 pips | SL=+10 pips')
+    print('  STRATEGY S4: 15-Min Opening Range Breakout - 2 Years')
+    print('  M15 candle 08:00 UTC = Opening Range')
+    print('  Breakout entry on close | SL=other side | TP=range size (1:1)')
+    print('  Expire 16:00 UTC')
     print(SEP)
 
     if not all_trades:
-        send_telegram('<b>S3 50 Pips/Day Backtest</b>' + NL + 'No trades.')
+        send_telegram('<b>S4 ORB Backtest</b>' + NL + 'No trades.')
         return
 
-    wins       = [t for t in all_trades if t['result'] in ('WIN', 'WIN_SL')]
-    double_sls = [t for t in all_trades if t['result'] == 'DOUBLE_SL']
-    expired    = [t for t in all_trades if t['result'] == 'EXPIRED']
-    clean_wins = [t for t in all_trades if t['result'] == 'WIN']
-    win_sl     = [t for t in all_trades if t['result'] == 'WIN_SL']
+    tps     = [t for t in all_trades if t['result'] == 'TP']
+    sls     = [t for t in all_trades if t['result'] == 'SL']
+    expired = [t for t in all_trades if t['result'] == 'EXPIRED']
 
-    total    = len(all_trades)
-    wr       = round(len(wins) / total * 100, 1) if total else 0
-    tot_pip  = round(sum(t['pips'] for t in all_trades), 1)
-    avg_win  = round(sum(t['pips'] for t in wins) / len(wins), 1) if wins else 0
-    avg_dsl  = round(sum(t['pips'] for t in double_sls) / len(double_sls), 1) if double_sls else 0
-    gw       = max(sum(t['pips'] for t in wins), 0)
-    gl_raw   = sum(t['pips'] for t in double_sls)
-    gl       = abs(gl_raw) if gl_raw < 0 else 1
-    pf       = round(gw / gl, 2) if gl > 0 else 0
+    total   = len(all_trades)
+    wr      = round(len(tps) / total * 100, 1) if total else 0
+    tot_pip = round(sum(t['pips'] for t in all_trades), 1)
+    avg_win = round(sum(t['pips'] for t in tps) / len(tps), 1) if tps else 0
+    avg_sl  = round(sum(t['pips'] for t in sls) / len(sls), 1) if sls else 0
+    gw      = sum(t['pips'] for t in tps)
+    gl      = abs(sum(t['pips'] for t in sls)) or 1
+    pf      = round(gw / gl, 2)
 
     max_cl = cl = 0
     for t in all_trades:
-        if t['result'] == 'DOUBLE_SL':
+        if t['result'] == 'SL':
             cl += 1
             max_cl = max(max_cl, cl)
         else:
             cl = 0
 
     print(NL + 'OVERALL:')
-    print('  Total trading days:     ' + str(total))
-    print('  WIN (TP + cancel):      ' + str(len(clean_wins)))
-    print('  WIN_SL (TP + one SL):   ' + str(len(win_sl)))
-    print('  DOUBLE SL (both stop):  ' + str(len(double_sls)))
-    print('  EXPIRED (no hit):       ' + str(len(expired)))
-    print('  Win Rate:               ' + str(wr) + '%')
-    print('  Avg Win day (pips):     +' + str(avg_win))
-    print('  Avg Double SL (pips):   ' + str(avg_dsl))
-    print('  Total Pips P&L:         ' + str(tot_pip))
-    print('  Profit Factor:          ' + str(pf))
-    print('  Max Consec Double SL:   ' + str(max_cl))
+    print('  Total trades:        ' + str(total))
+    print('  TP hit (winner):     ' + str(len(tps)))
+    print('  SL hit (loser):      ' + str(len(sls)))
+    print('  Expired (no hit):    ' + str(len(expired)))
+    print('  Win Rate:            ' + str(wr) + '%')
+    print('  Avg Win (pips):      +' + str(avg_win))
+    print('  Avg Loss (pips):     ' + str(avg_sl))
+    print('  Total Pips:          ' + str(tot_pip))
+    print('  Profit Factor:       ' + str(pf))
+    print('  Max Consec Losses:   ' + str(max_cl))
 
     print(NL + 'BY PAIR:')
-    print('  ' + 'Pair'.ljust(10) +
-          'Days'.rjust(5) +
-          'Wins'.rjust(5) +
-          'WR%'.rjust(8) +
-          'DSL'.rjust(5) +
-          'Exp'.rjust(5) +
-          'Pips'.rjust(8))
-    print('  ' + '-' * 50)
+    print('  ' + 'Pair'.ljust(10) + 'Trades  Wins   WR%    Pips')
     for pair in sorted(set(t['pair'] for t in all_trades)):
-        pt  = [t for t in all_trades if t['pair'] == pair]
-        pw  = [t for t in pt if t['result'] in ('WIN', 'WIN_SL')]
-        pdsl = [t for t in pt if t['result'] == 'DOUBLE_SL']
-        pexp = [t for t in pt if t['result'] == 'EXPIRED']
+        pt = [t for t in all_trades if t['pair'] == pair]
+        pw = [t for t in pt if t['result'] == 'TP']
         wrp = round(len(pw) / len(pt) * 100, 1) if pt else 0
         ppp = round(sum(t['pips'] for t in pt), 1)
         print('  ' + pair.replace('_', '/').ljust(10) +
               str(len(pt)).rjust(5) +
-              str(len(pw)).rjust(5) +
+              str(len(pw)).rjust(6) +
               str(wrp).rjust(8) + '%' +
-              str(len(pdsl)).rjust(5) +
-              str(len(pexp)).rjust(5) +
               str(ppp).rjust(8))
 
     print(NL + 'FULL TRADE LOG:')
-    print('  ' + '-' * 90)
-    print('  Date        Pair      Entry    BuyTP    BuySL    SellTP   SellSL   BuyRes  SellRes  Net')
-    print('  ' + '-' * 90)
+    print('  Date       Pair     Dir   ORange   Entry     SL        TP        Result  Pips')
     for t in all_trades:
-        print('  ' + t['date'] + '  ' +
-              t['pair'].replace('_', '/').ljust(8) + '  ' +
+        print('  ' + t['date'] + ' ' +
+              t['pair'].replace('_', '/').ljust(8) + ' ' +
+              t['direction'].ljust(4) + ' ' +
+              str(t['or_pips']).rjust(4) + 'p ' +
               str(t['entry']).ljust(8) + ' ' +
-              str(t['buy_tp']).ljust(8) + ' ' +
-              str(t['buy_sl']).ljust(8) + ' ' +
-              str(t['sell_tp']).ljust(8) + ' ' +
-              str(t['sell_sl']).ljust(8) + ' ' +
-              t['buy_result'].ljust(7) + ' ' +
-              t['sell_result'].ljust(7) + ' ' +
+              str(t['sl']).ljust(8) + ' ' +
+              str(t['tp']).ljust(8) + ' ' +
+              t['result'].ljust(7) + ' ' +
               str(t['pips']) + 'p')
 
     print(NL + SEP)
 
-    # Telegram summary
+    # Telegram
     tg = (
-        '<b>S3: 50 Pips A Day - 2 Years</b>' + NL +
-        '07:00 UTC entry | Expire 20:00 UTC' + NL +
-        'BUY +50p/-10p | SELL -50p/+10p' + NL + NL +
+        '<b>S4: 15-Min ORB - 2 Years</b>' + NL +
+        '08:00 UTC range | 1:1 RR | Expire 16:00' + NL + NL +
         '<b>OVERALL:</b>' + NL +
-        'Trading Days: ' + str(total) + NL +
-        'WIN (TP+cancel): ' + str(len(clean_wins)) + NL +
-        'WIN_SL (TP+SL):  ' + str(len(win_sl)) + NL +
-        'DOUBLE SL:       ' + str(len(double_sls)) + NL +
-        'EXPIRED:         ' + str(len(expired)) + NL +
+        'Trades: ' + str(total) + NL +
+        'TP:  ' + str(len(tps)) + NL +
+        'SL:  ' + str(len(sls)) + NL +
+        'Exp: ' + str(len(expired)) + NL +
         'Win Rate: <b>' + str(wr) + '%</b>' + NL +
         'Avg Win:  +' + str(avg_win) + 'p' + NL +
-        'Avg Dbl SL: ' + str(avg_dsl) + 'p' + NL +
+        'Avg Loss: ' + str(avg_sl) + 'p' + NL +
         'Total P&L: ' + str(tot_pip) + 'p' + NL +
         'Profit Factor: ' + str(pf) + NL +
-        'Max Consec DSL: ' + str(max_cl) + NL + NL +
+        'Max Consec SL: ' + str(max_cl) + NL + NL +
         '<b>BY PAIR:</b>' + NL
     )
     for pair in sorted(set(t['pair'] for t in all_trades)):
-        pt  = [t for t in all_trades if t['pair'] == pair]
-        pw  = [t for t in pt if t['result'] in ('WIN', 'WIN_SL')]
+        pt = [t for t in all_trades if t['pair'] == pair]
+        pw = [t for t in pt if t['result'] == 'TP']
         wrp = round(len(pw) / len(pt) * 100, 1) if pt else 0
         ppp = round(sum(t['pips'] for t in pt), 1)
         tg += (pair.replace('_', '/').ljust(10) +
-               ' D:' + str(len(pt)) + ' W:' + str(len(pw)) +
+               ' T:' + str(len(pt)) + ' W:' + str(len(pw)) +
                ' WR:' + str(wrp) + '% P&L:' + str(ppp) + 'p' + NL)
     send_telegram(tg)
 
-    # Trade chunks
     chunk_size = 30
     for cs in range(0, len(all_trades), chunk_size):
         chunk = all_trades[cs:cs + chunk_size]
@@ -397,34 +380,35 @@ def print_results(all_trades):
         for t in chunk:
             m += (t['date'] + ' ' +
                   t['pair'].replace('_', '/').ljust(8) + ' ' +
+                  t['direction'].ljust(4) + ' ' +
                   'E:' + str(t['entry']) + ' ' +
-                  'B:' + t['buy_result'].ljust(3) + '(' + str(t['buy_pips']) + 'p) ' +
-                  'S:' + t['sell_result'].ljust(3) + '(' + str(t['sell_pips']) + 'p) ' +
-                  'Net:' + str(t['pips']) + 'p' + NL)
+                  'SL:' + str(t['sl']) + ' ' +
+                  'TP:' + str(t['tp']) + ' ' +
+                  t['result'].ljust(5) + ' ' + str(t['pips']) + 'p' + NL)
         send_telegram(m)
 
 # ─── MAIN ────────────────────────────────────────────────────
 def main():
     print('=' * 65)
-    print('  STRATEGY S3: 50 Pips A Day - 2 Years')
-    print('  07:00 UTC entry - TP 50 pips - SL 10 pips each side')
+    print('  STRATEGY S4: 15-Min Opening Range Breakout - 2 Years')
+    print('  Documented WR 55-60% at 1:1 RR')
     print('=' * 65)
 
     all_trades = []
     for pair in PAIRS:
         try:
             print(chr(10) + 'Fetching ' + pair + '...')
-            h1 = fetch_2years(pair, 'H1')
-            print('  H1:' + str(len(h1)))
-            if len(h1) < 50:
+            m15 = fetch_2years(pair, 'M15')
+            print('  M15:' + str(len(m15)))
+            if len(m15) < 100:
                 continue
-            trades = backtest_pair(pair, h1)
+            trades = backtest_pair(pair, m15)
             all_trades.extend(trades)
-            wins = [t for t in trades if t['result'] in ('WIN', 'WIN_SL')]
-            wr   = round(len(wins) / len(trades) * 100, 1) if trades else 0
-            tot  = round(sum(t['pips'] for t in trades), 1)
-            print('  Days:' + str(len(trades)) +
-                  '  Wins:' + str(len(wins)) +
+            tps = [t for t in trades if t['result'] == 'TP']
+            wr  = round(len(tps) / len(trades) * 100, 1) if trades else 0
+            tot = round(sum(t['pips'] for t in trades), 1)
+            print('  Trades:' + str(len(trades)) +
+                  '  Wins:' + str(len(tps)) +
                   '  WR:' + str(wr) + '%' +
                   '  P&L:' + str(tot) + 'p')
         except Exception as e:
