@@ -9,7 +9,7 @@
     "tp1": 1.16214,
     "tp2": 1.11784,
     "tp3": 1.1164,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": 1.16372,
     "aoi_bottom": 1.15802,
@@ -160,5 +160,21 @@
     "aoi_bottom": 1.15802,
     "opened_at": "2026-05-26 15:01 UTC",
     "opened_ts": 1779807678.990597
+  },
+  "EUR_USD_2026-05-26_16:01": {
+    "pair": "EUR_USD",
+    "trade_key": "EUR_USD_2026-05-26_16:01",
+    "direction": "SELL",
+    "entry": 1.16194,
+    "sl": 1.16503,
+    "tp1": 1.15885,
+    "tp2": 1.11784,
+    "tp3": 1.1164,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 1.16372,
+    "aoi_bottom": 1.15802,
+    "opened_at": "2026-05-26 16:01 UTC",
+    "opened_ts": 1779811276.51661
   }
 }
