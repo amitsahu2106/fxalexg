@@ -567,11 +567,13 @@ def score(trends, aoi_zone, hs, ema_sig, entry_signal=None, entry_tf=None):
     # Cap at 10
     pts = round(min(pts, 10.0), 1)
 
-    # Grade
+    # Grade based purely on score (honest display in scorecard)
+    grade = 'A+' if pts >= 8.0 else 'B+' if pts >= 7.0 else 'C+' if pts >= 5.0 else 'D+'
+
+    # Alert eligibility: need 3+ TFs aligned AND A+/B+ score
+    # Store tf count in reasons for transparency
     if majority_tfs < 3:
-        grade = 'D+'
-    else:
-        grade = 'A+' if pts >= 8.0 else 'B+' if pts >= 7.0 else 'C+' if pts >= 5.0 else 'D+'
+        reasons.append('Only ' + str(majority_tfs) + '/4 TFs aligned - need 3 minimum (no alert)')
 
     return grade, pts, reasons
 
@@ -820,6 +822,7 @@ def add_trade(pair, direction, entry, sl, tp1, tp2, tp3, aoi_zone):
     trade_key = pair + '_' + now.strftime('%Y-%m-%d_%H:%M')
     trades[trade_key] = {
         'pair':       pair,
+        'strategy':   'FXALEXG',
         'trade_key':  trade_key,
         'direction':  direction,
         'entry':      entry,
@@ -1213,32 +1216,51 @@ def analyse_fxalexg(pair):
     grade, pts, reasons = score(trends, aoi_zone, best_hs, ema_sig, entry_signal, entry_tf)
     print("     Grade: " + grade + " | Score: " + str(pts) + " | Trends: " + str(trends))
 
+    # Block if fewer than 3 TFs aligned (regardless of score)
+    majority_count = max(
+        sum(1 for t in trends.values() if t == 'BULLISH'),
+        sum(1 for t in trends.values() if t == 'BEARISH')
+    )
+    if majority_count < 3:
+        print('     Blocked - only ' + str(majority_count) + '/4 TFs aligned (need 3)')
+        return {'pair': pair, 'grade': grade, 'pts': pts,
+                'direction': direction, 'trends': trends}
+
     if grade not in MIN_GRADE_TO_ALERT:
         return {'pair': pair, 'grade': grade, 'pts': pts,
                 'direction': direction, 'trends': trends}
 
-    # Signal rules: allow new signal if either:
-    # 1. TP1 has been hit on any existing trade for this pair, OR
-    # 2. 24 hours have passed since the last signal for this pair
+    # Signal blocking rules for FXAlexG:
+    # Only look at FXAlexG trades for this pair (not Gold 2R or AP15R)
+    # Allow new signal ONLY if:
+    #   - TP1 hit on the MOST RECENT FXAlexG trade, OR
+    #   - 24h have passed since the MOST RECENT FXAlexG signal
     active_trades = load_trades()
     pair_trades   = {k: v for k, v in active_trades.items()
-                     if not k.startswith('_') and v.get('pair') == pair}
+                     if not k.startswith('_')
+                     and v.get('pair') == pair
+                     and v.get('strategy', 'FXALEXG') == 'FXALEXG'}
 
     if pair_trades:
-        now_ts         = datetime.now(timezone.utc).timestamp()
-        any_tp1_hit    = any(t.get('tp1_hit', False) for t in pair_trades.values())
-        most_recent_ts = max(t.get('opened_ts', 0) for t in pair_trades.values())
-        hours_since    = (now_ts - most_recent_ts) / 3600
+        now_ts = datetime.now(timezone.utc).timestamp()
 
-        if not any_tp1_hit and hours_since < 24:
+        # Sort by opened_ts - most recent first
+        sorted_trades = sorted(pair_trades.values(),
+                               key=lambda t: t.get('opened_ts', 0),
+                               reverse=True)
+        most_recent   = sorted_trades[0]
+        hours_since   = (now_ts - most_recent.get('opened_ts', 0)) / 3600
+        tp1_hit_recent = most_recent.get('tp1_hit', False)
+
+        if not tp1_hit_recent and hours_since < 24:
             print('     Skipped - ' + pair +
-                  ' (' + str(round(hours_since, 1)) + 'h since last signal, no TP1 yet)')
+                  ' (' + str(round(hours_since, 1)) + 'h since last FXAlexG signal, TP1 not hit)')
             return {'pair': pair, 'grade': grade, 'pts': pts,
                     'direction': direction, 'trends': trends}
-        elif any_tp1_hit:
-            print('     TP1 hit for ' + pair + ' - new signal allowed')
+        elif tp1_hit_recent:
+            print('     TP1 hit on last trade - new FXAlexG signal allowed')
         else:
-            print('     24h passed for ' + pair + ' - new signal allowed')
+            print('     24h passed since last FXAlexG signal - new signal allowed')
 
 
     # Calculate SL and TP using AOI-based method
