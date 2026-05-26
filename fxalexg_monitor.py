@@ -88,7 +88,19 @@ def fetch_candles(pair, granularity, count=120):
     headers = {"Authorization": "Bearer " + OANDA_API_KEY}
     params  = {"granularity": granularity, "count": count, "price": "M"}
     try:
-        r = requests.get(url, headers=headers, params=params, timeout=10)
+        r = None
+        for attempt in range(3):
+            try:
+                r = requests.get(url, headers=headers, params=params, timeout=30)
+                break
+            except Exception:
+                print("  Fetch timeout " + pair + "/" + granularity +
+                      " attempt " + str(attempt + 1) + "/3 - retrying...")
+                if attempt < 2:
+                    time.sleep(3)
+        if r is None:
+            print("  Fetch error " + pair + "/" + granularity + ": all retries failed")
+            return []
         if r.status_code != 200:
             print("  OANDA error " + str(r.status_code) + " for " + pair + "/" + granularity)
             return []
@@ -771,7 +783,7 @@ def send_telegram(msg):
         r = requests.post(
             "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/sendMessage",
             json={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"},
-            timeout=10,
+            timeout=30,
         )
         if r.status_code != 200:
             print("  Telegram error " + str(r.status_code))
