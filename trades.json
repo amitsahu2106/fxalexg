@@ -25,7 +25,7 @@
     "tp1": 0.58529,
     "tp2": 0.57643,
     "tp3": 0.57539,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": 0.58743,
     "aoi_bottom": 0.58162,
