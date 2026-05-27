@@ -1,3 +1,37 @@
 {
-  "_ict_last_alert": 1779807704.1339219
+  "_ict_last_alert": 1779807704.1339219,
+  "GBP_USD_2026-05-27_07:01": {
+    "pair": "GBP_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "GBP_USD_2026-05-27_07:01",
+    "direction": "SELL",
+    "entry": 1.34524,
+    "sl": 1.34777,
+    "tp1": 1.34271,
+    "tp2": 1.33788,
+    "tp3": 1.3354,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 1.34668,
+    "aoi_bottom": 1.34352,
+    "opened_at": "2026-05-27 07:01 UTC",
+    "opened_ts": 1779865260.700236
+  },
+  "AUD_USD_2026-05-27_07:01": {
+    "pair": "AUD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "AUD_USD_2026-05-27_07:01",
+    "direction": "SELL",
+    "entry": 0.71464,
+    "sl": 0.71649,
+    "tp1": 0.71279,
+    "tp2": 0.69571,
+    "tp3": 0.69282,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.71526,
+    "aoi_bottom": 0.71048,
+    "opened_at": "2026-05-27 07:01 UTC",
+    "opened_ts": 1779865267.322215
+  }
 }
