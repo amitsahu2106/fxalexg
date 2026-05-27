@@ -1,0 +1,38 @@
+name: Debug Candle Data
+
+on:
+  workflow_dispatch:
+    inputs:
+      pair:
+        description: 'Pair to debug (e.g. EUR_USD, GBP_USD, XAU_USD)'
+        required: true
+        default: 'EUR_USD'
+        type: string
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run Debug
+        env:
+          OANDA_API_KEY:      ${{ secrets.OANDA_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+          DEBUG_PAIR:         ${{ github.event.inputs.pair }}
+        run: python3 debug_candles.py
