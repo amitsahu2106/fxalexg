@@ -1,21 +1,5 @@
 {
   "_ict_last_alert": 1779807704.1339219,
-  "EUR_USD_2026-05-25_08:00": {
-    "pair": "EUR_USD",
-    "trade_key": "EUR_USD_2026-05-25_08:00",
-    "direction": "SELL",
-    "entry": 1.16374,
-    "sl": 1.16534,
-    "tp1": 1.16214,
-    "tp2": 1.11784,
-    "tp3": 1.1164,
-    "tp1_hit": true,
-    "tp2_hit": false,
-    "aoi_top": 1.16372,
-    "aoi_bottom": 1.15802,
-    "opened_at": "2026-05-25 08:00 UTC",
-    "opened_ts": 1779696056.785652
-  },
   "NZD_USD_2026-05-25_10:00": {
     "pair": "NZD_USD",
     "trade_key": "NZD_USD_2026-05-25_10:00",
@@ -96,22 +80,6 @@
     "aoi_bottom": 0.58306,
     "opened_at": "2026-05-26 06:01 UTC",
     "opened_ts": 1779775266.842924
-  },
-  "EUR_USD_2026-05-26_08:23": {
-    "pair": "EUR_USD",
-    "trade_key": "EUR_USD_2026-05-26_08:23",
-    "direction": "SELL",
-    "entry": 1.16371,
-    "sl": 1.16463,
-    "tp1": 1.16279,
-    "tp2": 1.11784,
-    "tp3": 1.1164,
-    "tp1_hit": true,
-    "tp2_hit": false,
-    "aoi_top": 1.16372,
-    "aoi_bottom": 1.15802,
-    "opened_at": "2026-05-26 08:23 UTC",
-    "opened_ts": 1779783805.39322
   },
   "EUR_USD_2026-05-26_14:01": {
     "pair": "EUR_USD",
