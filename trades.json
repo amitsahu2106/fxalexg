@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1779807704.1339219,
+  "_ict_last_alert": 1779868884.652547,
   "GBP_USD_2026-05-27_07:01": {
     "pair": "GBP_USD",
     "strategy": "FXALEXG",
@@ -33,5 +33,22 @@
     "aoi_bottom": 0.71048,
     "opened_at": "2026-05-27 07:01 UTC",
     "opened_ts": 1779865267.322215
+  },
+  "EUR_USD_2026-05-27_08:00": {
+    "pair": "EUR_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "EUR_USD_2026-05-27_08:00",
+    "direction": "SELL",
+    "entry": 1.16405,
+    "sl": 1.1646,
+    "tp1": 1.1635,
+    "tp2": 1.11784,
+    "tp3": 1.1164,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 1.16372,
+    "aoi_bottom": 1.15802,
+    "opened_at": "2026-05-27 08:00 UTC",
+    "opened_ts": 1779868858.371879
   }
 }
