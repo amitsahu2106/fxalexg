@@ -83,6 +83,16 @@ def from_pips(pips, pair):
 # ─────────────────────────────────────────────
 # OANDA DATA FETCHER
 # ─────────────────────────────────────────────
+
+# ─── IST TIME HELPERS ────────────────────────────────────
+def ist_now():
+    now_ist = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+    return now_ist.strftime('%d %b %Y, %I:%M %p IST')
+
+def to_ist(utc_dt):
+    ist = utc_dt + timedelta(hours=5, minutes=30)
+    return ist.strftime('%I:%M %p IST')
+
 def fetch_candles(pair, granularity, count=120):
     url     = OANDA_BASE_URL + "/v3/instruments/" + pair + "/candles"
     headers = {"Authorization": "Bearer " + OANDA_API_KEY}
@@ -993,7 +1003,11 @@ def check_active_trades():
             print('  Could not fetch candles for ' + pair)
             continue
 
-        price     = latest[-1]['close']
+        # Use close for P&L display, but high/low for SL/TP detection
+        candle    = latest[-1]
+        price     = candle['close']   # for P&L display
+        high      = candle['high']    # for TP detection (wick reaches TP)
+        low       = candle['low']     # for SL detection (wick hits SL)
         direction = trade['direction']
         entry     = trade['entry']
         sl        = trade['sl']
@@ -1018,16 +1032,16 @@ def check_active_trades():
         # After TP1 hit SL moves to breakeven
         effective_sl = entry if tp1_hit else sl
 
-        sl_hit        = ((direction == 'BUY'  and price <= effective_sl) or
-                         (direction == 'SELL' and price >= effective_sl))
+        sl_hit        = ((direction == 'BUY'  and low  <= effective_sl) or
+                         (direction == 'SELL' and high >= effective_sl))
         tp1_newly_hit = ((not tp1_hit) and
-                         ((direction == 'BUY'  and price >= tp1) or
-                          (direction == 'SELL' and price <= tp1)))
+                         ((direction == 'BUY'  and high >= tp1) or
+                          (direction == 'SELL' and low  <= tp1)))
         tp2_newly_hit = ((tp1_hit and not tp2_hit_f) and
-                         ((direction == 'BUY'  and price >= tp2) or
-                          (direction == 'SELL' and price <= tp2)))
-        tp3_hit       = ((direction == 'BUY'  and price >= tp3) or
-                         (direction == 'SELL' and price <= tp3))
+                         ((direction == 'BUY'  and high >= tp2) or
+                          (direction == 'SELL' and low  <= tp2)))
+        tp3_hit       = ((direction == 'BUY'  and high >= tp3) or
+                         (direction == 'SELL' and low  <= tp3))
 
         strategy = trade.get('strategy', 'FXALEXG')
         if strategy == 'GOLD_2R':
@@ -1036,9 +1050,15 @@ def check_active_trades():
             strategy_label = 'All Pairs 1.5R Strategy'
         else:
             strategy_label = 'FXAlexG Strategy'
+        # Convert opened_at from UTC to IST for display
+        try:
+            opened_dt  = datetime.strptime(opened_at[:16], '%Y-%m-%d %H:%M').replace(tzinfo=timezone.utc)
+            opened_ist = (opened_dt + timedelta(hours=5, minutes=30)).strftime('%d %b %I:%M %p IST')
+        except:
+            opened_ist = opened_at
         header = (strategy_label + NL +
                   pair.replace('_', '/') + ' ' + direction +
-                  ' [' + opened_at + ']' + NL)
+                  ' [' + opened_ist + ']' + NL)
 
         if tp3_hit:
             send_telegram('TP3 HIT - MAX TARGET ' + NL + header +
@@ -1313,7 +1333,7 @@ def analyse_fxalexg(pair):
         "<b>" + pair.replace('_', '/') + "  [" + grade + "]  Score: " + str(pts) + "/10</b>\n\n"
         "Price: <code>" + str(price) + "</code>\n"
         "Direction: " + direction + "\n"
-        "Time: " + datetime.now(timezone.utc).strftime('%H:%M UTC') + "\n"
+        "Time: " + ist_now() + "\n"
         + es_line +
         "\nSL:  <code>" + str(sl) + "</code> (risk " + str(risk_pips) + " pips)\n"
         "TP1: <code>" + str(tp1) + "</code> (1R)\n"
@@ -1552,7 +1572,7 @@ def analyse_gold_2r():
     msg = (
         '<b>Gold 2R Strategy Alert</b>' + NL +
         '<b>' + pair_disp + ' ' + trend_dir + '</b>' + NL + NL +
-        'Time: ' + now.strftime('%H:%M UTC') + NL +
+        'Time: ' + to_ist(now) + NL +
         'Entry: <code>' + str(round(price, 2)) + '</code>' + NL +
         'SL:  <code>' + str(round(sl, 2)) + '</code> (' + str(risk_pips) + ' pips)' + NL +
         'TP1: <code>' + str(round(tp1, 2)) + '</code> (2R)' + NL +
@@ -1810,7 +1830,7 @@ def analyse_all_pairs_15r(pair):
     msg = (
         '<b>All Pairs 1.5R Strategy Alert</b>' + NL +
         '<b>' + pair_disp + ' ' + trend_dir + '</b>' + NL + NL +
-        'Time: ' + now.strftime('%H:%M UTC') + NL +
+        'Time: ' + to_ist(now) + NL +
         'Entry: <code>' + str(round(price, 5)) + '</code>' + NL +
         'SL:  <code>' + str(round(sl, 5)) + '</code> (' + str(risk_pips) + ' pips)' + NL +
         'TP1: <code>' + str(round(tp1, 5)) + '</code> (1.5R)' + NL +
@@ -1943,7 +1963,7 @@ def analyse_ict_gold():
         emoji + " <b>ICT Killzone Alert</b>\n"
         "<b>XAU/USD (Gold)</b>\n\n"
         "Price: <code>" + str(price) + "</code>\n"
-        "Time: " + datetime.now(timezone.utc).strftime('%H:%M UTC') + "\n"
+        "Time: " + ist_now() + "\n"
         "Session: " + killzone + " Killzone\n"
         "Daily Bias: " + daily_bias + "\n\n"
         "<b>Asian Range:</b>\n"
@@ -2155,13 +2175,21 @@ def main():
     now_utc = datetime.now(timezone.utc)
     print("Scan @ " + now_utc.strftime('%Y-%m-%d %H:%M UTC'))
 
-    # ── News alert at 07:30 UTC (1:00 PM IST) ────────────────
-    # Send once per day - the 07:30 trigger covers 2PM IST to 2PM IST
-    if now_utc.hour == 7 and now_utc.minute < 60:
-        try:
-            send_news_alert()
-        except Exception as e:
-            print("  ERROR News: " + str(e))
+    # ── News alert: fires between 07:00-08:59 UTC (12:30-2:30 PM IST) ──
+    # Covers any hourly cron run that falls in 1PM IST window
+    # Uses a flag file in trades.json to send only ONCE per day
+    if now_utc.hour in (7, 8):
+        news_key  = '_news_sent_' + now_utc.strftime('%Y-%m-%d')
+        tr_check  = load_trades()
+        if news_key not in tr_check:
+            try:
+                send_news_alert()
+                tr_check[news_key] = now_utc.strftime('%H:%M UTC')
+                save_trades(tr_check)
+            except Exception as e:
+                print("  ERROR News: " + str(e))
+        else:
+            print("  News already sent today (" + tr_check[news_key] + ")")
 
     # Skip everything else if market is closed (weekend)
     if not is_market_open():
@@ -2190,8 +2218,8 @@ def main():
     # Send single scorecard message to Telegram
     if scorecard:
         NL  = chr(10)
-        now = datetime.now(timezone.utc).strftime('%H:%M UTC')
-        sc_msg = '<b>Market Scorecard ' + now + '</b>' + NL
+        sc_now = datetime.now(timezone.utc)
+        sc_msg = '<b>Market Scorecard ' + to_ist(sc_now) + '</b>' + NL
         sc_msg += '(Needs 8.0+ for A+ alert)' + NL + NL
         for r in sorted(scorecard, key=lambda x: x['pts'], reverse=True):
             grade = r['grade']
