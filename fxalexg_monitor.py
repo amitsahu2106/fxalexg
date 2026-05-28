@@ -128,7 +128,7 @@ def body_high(candle):
 def body_low(candle):
     return min(candle['open'], candle['close'])
 
-def swing_points(candles, lookback=5):
+def swing_points(candles, lookback=2):
     # Body prices only - FXAlexG rule (no wicks)
     highs, lows = [], []
     for i in range(lookback, len(candles) - lookback):
@@ -289,7 +289,7 @@ def detect_aois(candles, pair):
     # STRONG AOI: >= 5 touches, >= 4 reversals, <= 60 pips -> 2.5 pts
     # GOOD AOI:   >= 3 touches, >= 3 reversals, <= 60 pips -> 1.5 pts
     # touches and reversals from SAME loop - always consistent
-    highs, lows = swing_points(candles, lookback=3)
+    highs, lows = swing_points(candles, lookback=2)
     max_zone    = from_pips(60, pair)
     levels      = sorted([p['price'] for p in highs + lows])
     zones, i    = [], 0
@@ -1973,13 +1973,197 @@ def is_market_open():
         return False
     return True
 
+
+# ═══════════════════════════════════════════════════════════════
+# HIGH IMPACT NEWS ALERT - ForexFactory Data
+# Source: nfs.faireconomy.media (official FF feed, works in GH Actions)
+# Runs at 07:30 UTC (1:00 PM IST) daily
+# Window: 08:30 UTC today to 08:30 UTC next day (2PM IST to 2PM IST)
+# ═══════════════════════════════════════════════════════════════
+
+NEWS_CURRENCY_PAIRS = {
+    'USD': ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CHF', 'NZD/USD', 'USD/CAD', 'XAU/USD'],
+    'EUR': ['EUR/USD'],
+    'GBP': ['GBP/USD'],
+    'JPY': ['USD/JPY'],
+    'AUD': ['AUD/USD'],
+    'CHF': ['USD/CHF'],
+    'NZD': ['NZD/USD'],
+    'CAD': ['USD/CAD'],
+    'XAU': ['XAU/USD'],
+    'CNY': ['AUD/USD'],
+    'CNH': ['AUD/USD'],
+    'ALL': ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CHF', 'NZD/USD', 'USD/CAD', 'XAU/USD'],
+}
+
+def et_to_utc(date_str, time_str, now_utc):
+    # FF times are in Eastern Time (auto EDT/EST)
+    # date_str: 'MM-DD-YYYY', time_str: '8:30am' or '12:00pm' or 'All Day' or ''
+    NL = chr(10)
+    if not time_str or time_str.lower() in ('all day', 'tentative', ''):
+        return None
+    try:
+        time_str = time_str.strip().lower()
+        am_pm = 'am' if 'am' in time_str else 'pm'
+        time_str = time_str.replace('am', '').replace('pm', '').strip()
+        parts = time_str.split(':')
+        h = int(parts[0])
+        m = int(parts[1]) if len(parts) > 1 else 0
+        if am_pm == 'pm' and h != 12:
+            h += 12
+        if am_pm == 'am' and h == 12:
+            h = 0
+
+        # Parse date
+        mo, da, yr = date_str.split('-')
+        from datetime import datetime as dt
+        event_naive = dt(int(yr), int(mo), int(da), h, m)
+
+        # DST: EDT (UTC-4) from second Sunday March to first Sunday November
+        # Approximate: EDT if month 3(after 8th)-11(before 1st), else EST
+        month = int(mo)
+        is_edt = (month > 3 and month < 11) or (month == 3 and int(da) >= 8) or (month == 11 and int(da) < 1)
+        offset_hours = 4 if is_edt else 5
+        from datetime import timezone, timedelta
+        utc_time = event_naive + timedelta(hours=offset_hours)
+        return utc_time.replace(tzinfo=timezone.utc)
+    except:
+        return None
+
+def send_news_alert():
+    print(chr(10) + '[News Alert] Fetching ForexFactory high impact news...')
+    NL = chr(10)
+
+    ff_headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://www.forexfactory.com/',
+        'Accept': 'application/json, text/plain, */*',
+    }
+
+    now_utc    = datetime.now(timezone.utc)
+    win_start  = now_utc.replace(hour=8, minute=30, second=0, microsecond=0)
+    win_end    = win_start + timedelta(hours=24)
+
+    # Fetch this week + next week to cover window boundaries
+    all_events = []
+    for url in [
+        'https://nfs.faireconomy.media/ff_calendar_thisweek.json',
+        'https://nfs.faireconomy.media/ff_calendar_nextweek.json',
+    ]:
+        try:
+            r = requests.get(url, headers=ff_headers, timeout=20)
+            if r.status_code == 200:
+                all_events.extend(r.json())
+                print('     Fetched ' + str(len(r.json())) + ' events from ' + url.split('/')[-1])
+            else:
+                print('     ' + url.split('/')[-1] + ': HTTP ' + str(r.status_code))
+        except Exception as e:
+            print('     Fetch error: ' + str(e))
+
+    if not all_events:
+        send_telegram('<b>News Alert</b>' + NL + 'Could not fetch ForexFactory data.')
+        return
+
+    # Filter: High impact only, within window
+    high_in_window = []
+    for e in all_events:
+        if e.get('impact') != 'High':
+            continue
+        utc_dt = et_to_utc(e.get('date', ''), e.get('time', ''), now_utc)
+        if utc_dt and win_start <= utc_dt < win_end:
+            e['_utc_dt'] = utc_dt
+            high_in_window.append(e)
+
+    # Sort by time
+    high_in_window.sort(key=lambda x: x['_utc_dt'])
+
+    print('     High impact events in window: ' + str(len(high_in_window)))
+
+    # Build Telegram message
+    now_ist = now_utc + timedelta(hours=5, minutes=30)
+    msg  = '<b>ForexFactory High Impact News</b>' + NL
+    msg += now_ist.strftime('%d %b %Y, %I:%M %p IST') + NL
+    msg += 'Window: 2:00 PM IST today to 2:00 PM IST tomorrow' + NL
+    msg += '(Source: ForexFactory)' + NL + NL
+
+    if not high_in_window:
+        msg += 'No high impact events in this window.'
+        send_telegram(msg)
+        return
+
+    # Group by date
+    seen_dates = []
+    for e in high_in_window:
+        d = e.get('date', '')
+        if d not in seen_dates:
+            seen_dates.append(d)
+
+    for date_key in seen_dates:
+        day_events = [e for e in high_in_window if e.get('date') == date_key]
+        if not day_events:
+            continue
+        # Format date label
+        try:
+            mo, da, yr = date_key.split('-')
+            from datetime import datetime as dt
+            d_obj = dt(int(yr), int(mo), int(da))
+            today = now_utc.date()
+            event_date = d_obj.date()
+            if event_date == today:
+                day_label = d_obj.strftime('%d %b') + ' (Today)'
+            else:
+                day_label = d_obj.strftime('%d %b') + ' (Tomorrow)'
+        except:
+            day_label = date_key
+
+        msg += '<b>' + day_label + '</b>' + NL
+
+        for e in day_events:
+            utc_dt   = e['_utc_dt']
+            currency = e.get('currency', '??')
+            title    = e.get('title', '??')
+            forecast = e.get('forecast', '') or ''
+            previous = e.get('previous', '') or ''
+
+            # Times
+            utc_str  = utc_dt.strftime('%H:%M UTC')
+            ist_dt   = utc_dt + timedelta(hours=5, minutes=30)
+            ist_str  = ist_dt.strftime('%I:%M %p IST')
+
+            # Affected pairs
+            pairs = NEWS_CURRENCY_PAIRS.get(currency.upper(), [])
+            pairs_str = ', '.join(pairs) if pairs else currency
+
+            msg += (utc_str + ' (' + ist_str + ')' + NL +
+                    currency + ' - ' + title + NL)
+            if forecast:
+                msg += 'Forecast: ' + forecast + NL
+            if previous:
+                msg += 'Previous: ' + previous + NL
+            msg += 'Pairs: ' + pairs_str + NL + NL
+
+    msg += 'Total: ' + str(len(high_in_window)) + ' high impact events'
+
+    send_telegram(msg)
+    print('     News alert sent - ' + str(len(high_in_window)) + ' events')
+
+
 def main():
     print("=" * 55)
     print("  FXAlexG + ICT Killzone Monitor - Single Scan")
     print("=" * 55)
-    print("Scan @ " + datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC'))
+    now_utc = datetime.now(timezone.utc)
+    print("Scan @ " + now_utc.strftime('%Y-%m-%d %H:%M UTC'))
 
-    # Skip everything if market is closed (weekend)
+    # ── News alert at 07:30 UTC (1:00 PM IST) ────────────────
+    # Send once per day - the 07:30 trigger covers 2PM IST to 2PM IST
+    if now_utc.hour == 7 and now_utc.minute < 60:
+        try:
+            send_news_alert()
+        except Exception as e:
+            print("  ERROR News: " + str(e))
+
+    # Skip everything else if market is closed (weekend)
     if not is_market_open():
         now = datetime.now(timezone.utc)
         print("Market is closed (weekend). Skipping scan.")
