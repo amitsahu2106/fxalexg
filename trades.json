@@ -1,22 +1,5 @@
 {
   "_ict_last_alert": 1779973290.0694268,
-  "EUR_USD_2026-05-28_06:00": {
-    "pair": "EUR_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "EUR_USD_2026-05-28_06:00",
-    "direction": "SELL",
-    "entry": 1.15994,
-    "sl": 1.16511,
-    "tp1": 1.15477,
-    "tp2": 1.11784,
-    "tp3": 1.1164,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 1.16372,
-    "aoi_bottom": 1.15802,
-    "opened_at": "2026-05-28 06:00 UTC",
-    "opened_ts": 1779948059.498795
-  },
   "USD_JPY_2026-05-28_07:01": {
     "pair": "USD_JPY",
     "strategy": "FXALEXG",
@@ -84,5 +67,22 @@
     "aoi_bottom": 1.33942,
     "opened_at": "2026-05-28 16:01 UTC",
     "opened_ts": 1779984080.541796
+  },
+  "AP15R_AUD_USD_2026-05-28_17:01": {
+    "pair": "AUD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_AUD_USD_2026-05-28_17:01",
+    "direction": "BUY",
+    "entry": 0.71683,
+    "sl": 0.70949,
+    "tp1": 0.72784,
+    "tp2": 0.73518,
+    "tp3": 0.74252,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-05-28 17:01 UTC",
+    "opened_ts": 1779987703.054475
   }
 }
