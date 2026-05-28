@@ -1154,7 +1154,9 @@ def analyse_fxalexg(pair):
         candles = fetch_candles(pair, tf)
         if len(candles) < 20:
             continue
-        h, l = swing_points(candles)
+        # Per-timeframe lookback: W/D use 1 candle, H4/H1/M15 use 2 candles
+        tf_lookback = 1 if tf in ('W', 'D') else 2
+        h, l = swing_points(candles, lookback=tf_lookback)
         trends[tf] = trend(h, l, candles)
         # AOI: Daily and Weekly only (FXAlexG rule)
         if tf in ('D', 'W'):
