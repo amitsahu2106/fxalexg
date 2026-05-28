@@ -33,5 +33,22 @@
     "aoi_bottom": 1.3354,
     "opened_at": "2026-05-28 06:01 UTC",
     "opened_ts": 1779948063.296164
+  },
+  "USD_JPY_2026-05-28_07:01": {
+    "pair": "USD_JPY",
+    "strategy": "FXALEXG",
+    "trade_key": "USD_JPY_2026-05-28_07:01",
+    "direction": "BUY",
+    "entry": 159.493,
+    "sl": 158.97414,
+    "tp1": 160.01186,
+    "tp2": 160.53072,
+    "tp3": 161.04958,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 159.596,
+    "aoi_bottom": 159.08,
+    "opened_at": "2026-05-28 07:01 UTC",
+    "opened_ts": 1779951662.620795
   }
 }
