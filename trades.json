@@ -34,23 +34,6 @@
     "opened_at": "2026-05-28 10:01 UTC",
     "opened_ts": 1779962485.715949
   },
-  "GBP_USD_2026-05-28_16:01": {
-    "pair": "GBP_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "GBP_USD_2026-05-28_16:01",
-    "direction": "SELL",
-    "entry": 1.34359,
-    "sl": 1.34715,
-    "tp1": 1.34003,
-    "tp2": 1.33317,
-    "tp3": 1.3307,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 1.34441,
-    "aoi_bottom": 1.33942,
-    "opened_at": "2026-05-28 16:01 UTC",
-    "opened_ts": 1779984080.541796
-  },
   "AP15R_AUD_USD_2026-05-28_17:01": {
     "pair": "AUD_USD",
     "strategy": "ALL_PAIRS_15R",
@@ -170,5 +153,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-05-29 14:01 UTC",
     "opened_ts": 1780063296.86769
+  },
+  "AP15R_NZD_USD_2026-05-29_15:01": {
+    "pair": "NZD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_NZD_USD_2026-05-29_15:01",
+    "direction": "BUY",
+    "entry": 0.59867,
+    "sl": 0.59254,
+    "tp1": 0.60786,
+    "tp2": 0.61399,
+    "tp3": 0.62012,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-05-29 15:01 UTC",
+    "opened_ts": 1780066916.112286
   }
 }
