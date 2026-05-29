@@ -34,23 +34,6 @@
     "opened_at": "2026-05-28 10:01 UTC",
     "opened_ts": 1779962485.715949
   },
-  "USD_CHF_2026-05-28_14:01": {
-    "pair": "USD_CHF",
-    "strategy": "FXALEXG",
-    "trade_key": "USD_CHF_2026-05-28_14:01",
-    "direction": "BUY",
-    "entry": 0.78714,
-    "sl": 0.78108,
-    "tp1": 0.7932,
-    "tp2": 0.79849,
-    "tp3": 0.80133,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 0.78685,
-    "aoi_bottom": 0.78265,
-    "opened_at": "2026-05-28 14:01 UTC",
-    "opened_ts": 1779976891.057603
-  },
   "GBP_USD_2026-05-28_16:01": {
     "pair": "GBP_USD",
     "strategy": "FXALEXG",
@@ -170,5 +153,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-05-29 13:01 UTC",
     "opened_ts": 1780059691.99542
+  },
+  "AP15R_NZD_USD_2026-05-29_14:01": {
+    "pair": "NZD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_NZD_USD_2026-05-29_14:01",
+    "direction": "BUY",
+    "entry": 0.59829,
+    "sl": 0.59242,
+    "tp1": 0.60709,
+    "tp2": 0.61296,
+    "tp3": 0.61883,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-05-29 14:01 UTC",
+    "opened_ts": 1780063296.86769
   }
 }
