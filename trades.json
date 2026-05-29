@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1780048906.3459666,
+  "_ict_last_alert": 1780059684.9337602,
   "USD_JPY_2026-05-28_07:01": {
     "pair": "USD_JPY",
     "strategy": "FXALEXG",
@@ -153,5 +153,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-05-29 08:01 UTC",
     "opened_ts": 1780041697.07039
+  },
+  "AP15R_NZD_USD_2026-05-29_13:01": {
+    "pair": "NZD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_NZD_USD_2026-05-29_13:01",
+    "direction": "BUY",
+    "entry": 0.59795,
+    "sl": 0.59242,
+    "tp1": 0.60624,
+    "tp2": 0.61177,
+    "tp3": 0.6173,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-05-29 13:01 UTC",
+    "opened_ts": 1780059691.99542
   }
 }
