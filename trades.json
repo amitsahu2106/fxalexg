@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1780041689.0583766,
+  "_ict_last_alert": 1780048906.3459666,
   "USD_JPY_2026-05-28_07:01": {
     "pair": "USD_JPY",
     "strategy": "FXALEXG",
@@ -28,7 +28,7 @@
     "tp2": 0.59657,
     "tp3": 0.59955,
     "tp1_hit": true,
-    "tp2_hit": false,
+    "tp2_hit": true,
     "aoi_top": null,
     "aoi_bottom": null,
     "opened_at": "2026-05-28 10:01 UTC",
