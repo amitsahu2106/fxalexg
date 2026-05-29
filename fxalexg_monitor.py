@@ -20,7 +20,7 @@ Strategy 2 - ICT Killzone (XAU/USD only)
 import requests
 import time
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 # ─────────────────────────────────────────────
 # CONFIGURATION
@@ -2260,3 +2260,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
