@@ -27,7 +27,7 @@
     "tp1": 0.59359,
     "tp2": 0.59657,
     "tp3": 0.59955,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": null,
     "aoi_bottom": null,
@@ -84,5 +84,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-05-28 17:01 UTC",
     "opened_ts": 1779987703.054475
+  },
+  "AP15R_NZD_USD_2026-05-29_05:21": {
+    "pair": "NZD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_NZD_USD_2026-05-29_05:21",
+    "direction": "BUY",
+    "entry": 0.59585,
+    "sl": 0.58817,
+    "tp1": 0.60737,
+    "tp2": 0.61505,
+    "tp3": 0.62273,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-05-29 05:21 UTC",
+    "opened_ts": 1780032108.613518
   }
 }
