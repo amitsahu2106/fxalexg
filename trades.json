@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1780300881.7106042,
+  "_ict_last_alert": 1780322502.1541388,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -19,23 +19,6 @@
     "aoi_bottom": 159.08,
     "opened_at": "2026-06-01 04:00 UTC",
     "opened_ts": 1780286456.527013
-  },
-  "AUD_USD_2026-06-01_05:01": {
-    "pair": "AUD_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "AUD_USD_2026-06-01_05:01",
-    "direction": "BUY",
-    "entry": 0.71856,
-    "sl": 0.71414,
-    "tp1": 0.72298,
-    "tp2": 0.7274,
-    "tp3": 0.73182,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 0.71857,
-    "aoi_bottom": 0.71526,
-    "opened_at": "2026-06-01 05:01 UTC",
-    "opened_ts": 1780290061.765653
   },
   "_news_sent_2026-06-01": "07:00 UTC",
   "USD_CHF_2026-06-01_09:01": {
@@ -65,7 +48,7 @@
     "tp1": 1.16398,
     "tp2": 1.15512,
     "tp3": 1.15222,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": 1.16433,
     "aoi_bottom": 1.15908,
@@ -88,5 +71,22 @@
     "aoi_bottom": 0.78265,
     "opened_at": "2026-06-01 13:01 UTC",
     "opened_ts": 1780318872.926376
+  },
+  "EUR_USD_2026-06-01_14:01": {
+    "pair": "EUR_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "EUR_USD_2026-06-01_14:01",
+    "direction": "SELL",
+    "entry": 1.16101,
+    "sl": 1.16581,
+    "tp1": 1.15621,
+    "tp2": 1.11784,
+    "tp3": 1.1164,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 1.16433,
+    "aoi_bottom": 1.15908,
+    "opened_at": "2026-06-01 14:01 UTC",
+    "opened_ts": 1780322468.294072
   }
 }
