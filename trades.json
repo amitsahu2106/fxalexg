@@ -2,5 +2,22 @@
   "_ict_last_alert": 1780059684.9337602,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
-  "_news_sent_2026-05-31": "07:00 UTC"
+  "_news_sent_2026-05-31": "07:00 UTC",
+  "USD_JPY_2026-06-01_04:00": {
+    "pair": "USD_JPY",
+    "strategy": "FXALEXG",
+    "trade_key": "USD_JPY_2026-06-01_04:00",
+    "direction": "BUY",
+    "entry": 159.48,
+    "sl": 158.94714,
+    "tp1": 160.01286,
+    "tp2": 160.54572,
+    "tp3": 161.07858,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 159.596,
+    "aoi_bottom": 159.08,
+    "opened_at": "2026-06-01 04:00 UTC",
+    "opened_ts": 1780286456.527013
+  }
 }
