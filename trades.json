@@ -54,5 +54,22 @@
     "aoi_bottom": 0.78265,
     "opened_at": "2026-06-01 09:01 UTC",
     "opened_ts": 1780304472.533765
+  },
+  "EUR_USD_2026-06-01_11:01": {
+    "pair": "EUR_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "EUR_USD_2026-06-01_11:01",
+    "direction": "SELL",
+    "entry": 1.16476,
+    "sl": 1.16554,
+    "tp1": 1.16398,
+    "tp2": 1.15512,
+    "tp3": 1.15222,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 1.16433,
+    "aoi_bottom": 1.15908,
+    "opened_at": "2026-06-01 11:01 UTC",
+    "opened_ts": 1780311663.605553
   }
 }
