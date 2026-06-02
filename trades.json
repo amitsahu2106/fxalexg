@@ -4,23 +4,6 @@
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
   "_news_sent_2026-06-01": "07:00 UTC",
-  "EUR_USD_2026-06-02_05:00": {
-    "pair": "EUR_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "EUR_USD_2026-06-02_05:00",
-    "direction": "SELL",
-    "entry": 1.16379,
-    "sl": 1.16536,
-    "tp1": 1.16222,
-    "tp2": 1.15512,
-    "tp3": 1.15222,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 1.16433,
-    "aoi_bottom": 1.15908,
-    "opened_at": "2026-06-02 05:00 UTC",
-    "opened_ts": 1780376456.863873
-  },
   "AP15R_NZD_USD_2026-06-02_05:01": {
     "pair": "NZD_USD",
     "strategy": "ALL_PAIRS_15R",
