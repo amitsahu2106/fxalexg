@@ -1777,17 +1777,22 @@ def analyse_all_pairs_15r(pair):
                      and v.get('pair') == pair}
 
     if pair_trades:
-        now_ts         = datetime.now(timezone.utc).timestamp()
-        any_tp1_hit    = any(t.get('tp1_hit', False) for t in pair_trades.values())
-        most_recent_ts = max(t.get('opened_ts', 0) for t in pair_trades.values())
-        hours_since    = (now_ts - most_recent_ts) / 3600
-        if not any_tp1_hit and hours_since < 24:
-            print('     Skipped - ' + str(round(hours_since, 1)) + 'h since last signal, no TP1 yet')
+        now_ts        = datetime.now(timezone.utc).timestamp()
+        sorted_trades = sorted(pair_trades.values(),
+                               key=lambda t: t.get('opened_ts', 0),
+                               reverse=True)
+        most_recent    = sorted_trades[0]
+        hours_since    = (now_ts - most_recent.get('opened_ts', 0)) / 3600
+        tp1_hit_recent = most_recent.get('tp1_hit', False)
+
+        if not tp1_hit_recent and hours_since < 24:
+            print('     Skipped - AP15R ' + pair + ': ' +
+                  str(round(hours_since, 1)) + 'h since last signal, TP1 not hit')
             return
-        elif any_tp1_hit:
-            print('     TP1 hit - new signal allowed')
+        elif tp1_hit_recent:
+            print('     TP1 hit on most recent AP15R trade - new signal allowed')
         else:
-            print('     24h passed - new signal allowed')
+            print('     24h passed for AP15R ' + pair + ' - new signal allowed')
 
     # ── Calculate SL and TPs ────────────────────────────────
     price = curr_h1['close']
@@ -2177,12 +2182,18 @@ def main():
     now_utc = datetime.now(timezone.utc)
     print("Scan @ " + now_utc.strftime('%Y-%m-%d %H:%M UTC'))
 
+    # ── Market closed check FIRST - skip everything on weekends ──
+    if not is_market_open():
+        print("Market is closed (weekend). Skipping all strategies and alerts.")
+        print("Market reopens Sunday 21:00 UTC.")
+        return
+
     # ── News alert: fires between 07:00-08:59 UTC (12:30-2:30 PM IST) ──
-    # Covers any hourly cron run that falls in 1PM IST window
-    # Uses a flag file in trades.json to send only ONCE per day
+    # Weekdays only (market open check above ensures this)
+    # Uses a flag in trades.json to send only ONCE per day
     if now_utc.hour in (7, 8):
-        news_key  = '_news_sent_' + now_utc.strftime('%Y-%m-%d')
-        tr_check  = load_trades()
+        news_key = '_news_sent_' + now_utc.strftime('%Y-%m-%d')
+        tr_check = load_trades()
         if news_key not in tr_check:
             try:
                 send_news_alert()
@@ -2192,13 +2203,6 @@ def main():
                 print("  ERROR News: " + str(e))
         else:
             print("  News already sent today (" + tr_check[news_key] + ")")
-
-    # Skip everything else if market is closed (weekend)
-    if not is_market_open():
-        now = datetime.now(timezone.utc)
-        print("Market is closed (weekend). Skipping scan.")
-        print("Market reopens Sunday 21:00 UTC.")
-        return
 
     print("\n--- Checking Active Trades ---")
     try:
@@ -2260,4 +2264,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
