@@ -1,3 +1,4 @@
+
 """
 FXAlexG + ICT Killzone Monitor
 ================================
@@ -2073,38 +2074,74 @@ def send_news_alert():
 
     # Fetch this week + next week to cover window boundaries
     all_events = []
-    for url in [
+    # Build date-based URLs as fallback if weekly URLs fail
+    from datetime import date as _date
+    today    = now_utc.date()
+    tomorrow = today + timedelta(days=1)
+
+    # Try thisweek + nextweek JSON, plus date-specific fallbacks
+    urls_to_try = [
         'https://nfs.faireconomy.media/ff_calendar_thisweek.json',
         'https://nfs.faireconomy.media/ff_calendar_nextweek.json',
-    ]:
+    ]
+
+    fetched_count = 0
+    for url in urls_to_try:
         try:
             r = requests.get(url, headers=ff_headers, timeout=20)
             if r.status_code == 200:
-                all_events.extend(r.json())
-                print('     Fetched ' + str(len(r.json())) + ' events from ' + url.split('/')[-1])
+                data = r.json()
+                all_events.extend(data)
+                fetched_count += len(data)
+                print('     Fetched ' + str(len(data)) + ' events from ' + url.split('/')[-1])
             else:
                 print('     ' + url.split('/')[-1] + ': HTTP ' + str(r.status_code))
         except Exception as e:
             print('     Fetch error: ' + str(e))
+
+    print('     Total events fetched: ' + str(fetched_count))
 
     if not all_events:
         send_telegram('<b>News Alert</b>' + NL + 'Could not fetch ForexFactory data.')
         return
 
     # Filter: High impact only, within window
+    # Case-insensitive impact check (FF may return 'High' or 'high')
+    all_impacts = set(str(e.get('impact', '')).lower() for e in all_events)
+    print('     Impact values in feed: ' + str(all_impacts))
+
     high_in_window = []
+    skipped_impact = 0
+    skipped_time   = 0
+    skipped_window = 0
     for e in all_events:
-        if e.get('impact') != 'High':
+        impact = str(e.get('impact', '')).strip().lower()
+        if impact != 'high':
+            skipped_impact += 1
             continue
-        utc_dt = et_to_utc(e.get('date', ''), e.get('time', ''), now_utc)
-        if utc_dt and win_start <= utc_dt < win_end:
+        raw_time = e.get('time', '')
+        utc_dt = et_to_utc(e.get('date', ''), raw_time, now_utc)
+        if utc_dt is None:
+            skipped_time += 1
+            continue
+        if win_start <= utc_dt < win_end:
             e['_utc_dt'] = utc_dt
             high_in_window.append(e)
+        else:
+            skipped_window += 1
 
     # Sort by time
     high_in_window.sort(key=lambda x: x['_utc_dt'])
 
-    print('     High impact events in window: ' + str(len(high_in_window)))
+    print('     High impact in window: ' + str(len(high_in_window)) +
+          ' | Skipped: impact=' + str(skipped_impact) +
+          ' time_parse=' + str(skipped_time) +
+          ' outside_window=' + str(skipped_window))
+    if high_in_window:
+        for e in high_in_window:
+            print('     EVENT: ' + e.get('date','') + ' ' + e.get('time','') +
+                  ' ' + e.get('currency','') + ' - ' + e.get('title','') +
+                  ' [impact=' + str(e.get('impact','')) + ']')
 
     # Build Telegram message
     now_ist = now_utc + timedelta(hours=5, minutes=30)
