@@ -38,5 +38,39 @@
     "opened_at": "2026-06-02 05:01 UTC",
     "opened_ts": 1780376480.316207
   },
-  "_news_sent_2026-06-02": "07:02 UTC"
+  "_news_sent_2026-06-02": "07:02 UTC",
+  "USD_CHF_2026-06-02_09:03": {
+    "pair": "USD_CHF",
+    "strategy": "FXALEXG",
+    "trade_key": "USD_CHF_2026-06-02_09:03",
+    "direction": "BUY",
+    "entry": 0.786,
+    "sl": 0.78157,
+    "tp1": 0.79043,
+    "tp2": 0.79849,
+    "tp3": 0.80133,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.78713,
+    "aoi_bottom": 0.78265,
+    "opened_at": "2026-06-02 09:03 UTC",
+    "opened_ts": 1780390995.341831
+  },
+  "AP15R_USD_CAD_2026-06-02_09:03": {
+    "pair": "USD_CAD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CAD_2026-06-02_09:03",
+    "direction": "BUY",
+    "entry": 1.38478,
+    "sl": 1.38186,
+    "tp1": 1.38916,
+    "tp2": 1.39208,
+    "tp3": 1.395,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-06-02 09:03 UTC",
+    "opened_ts": 1780391011.563068
+  }
 }
