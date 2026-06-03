@@ -90,5 +90,22 @@
     "opened_at": "2026-06-03 00:02 UTC",
     "opened_ts": 1780444950.186305
   },
-  "_news_sent_2026-06-03": "07:02 UTC"
+  "_news_sent_2026-06-03": "07:02 UTC",
+  "USD_CHF_2026-06-03_10:02": {
+    "pair": "USD_CHF",
+    "strategy": "FXALEXG",
+    "trade_key": "USD_CHF_2026-06-03_10:02",
+    "direction": "BUY",
+    "entry": 0.78938,
+    "sl": 0.78797,
+    "tp1": 0.79079,
+    "tp2": 0.79849,
+    "tp3": 0.80133,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.79428,
+    "aoi_bottom": 0.78902,
+    "opened_at": "2026-06-03 10:02 UTC",
+    "opened_ts": 1780480957.911352
+  }
 }
