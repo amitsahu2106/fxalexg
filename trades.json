@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1780477385.6547346,
+  "_ict_last_alert": 1780491788.219914,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -15,7 +15,7 @@
     "tp1": 0.79043,
     "tp2": 0.79849,
     "tp3": 0.80133,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": 0.78713,
     "aoi_bottom": 0.78265,
@@ -66,7 +66,7 @@
     "tp1": 1.16045,
     "tp2": 1.15512,
     "tp3": 1.15222,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": 1.16433,
     "aoi_bottom": 1.15908,
@@ -107,5 +107,22 @@
     "aoi_bottom": 0.78902,
     "opened_at": "2026-06-03 10:02 UTC",
     "opened_ts": 1780480957.911352
+  },
+  "EUR_USD_2026-06-03_13:02": {
+    "pair": "EUR_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "EUR_USD_2026-06-03_13:02",
+    "direction": "SELL",
+    "entry": 1.16005,
+    "sl": 1.1657,
+    "tp1": 1.1544,
+    "tp2": 1.11784,
+    "tp3": 1.1164,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 1.16433,
+    "aoi_bottom": 1.15908,
+    "opened_at": "2026-06-03 13:02 UTC",
+    "opened_ts": 1780491770.457312
   }
 }
