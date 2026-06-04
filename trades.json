@@ -23,23 +23,6 @@
     "opened_at": "2026-06-04 05:02 UTC",
     "opened_ts": 1780549347.434948
   },
-  "GBP_USD_2026-06-04_05:02": {
-    "pair": "GBP_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "GBP_USD_2026-06-04_05:02",
-    "direction": "SELL",
-    "entry": 1.3431,
-    "sl": 1.34588,
-    "tp1": 1.34032,
-    "tp2": 1.33489,
-    "tp3": 1.33242,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 1.34441,
-    "aoi_bottom": 1.33942,
-    "opened_at": "2026-06-04 05:02 UTC",
-    "opened_ts": 1780549351.312542
-  },
   "USD_JPY_2026-06-04_05:02": {
     "pair": "USD_JPY",
     "strategy": "FXALEXG",
@@ -74,40 +57,6 @@
     "opened_at": "2026-06-04 05:02 UTC",
     "opened_ts": 1780549358.396881
   },
-  "USD_CHF_2026-06-04_05:02": {
-    "pair": "USD_CHF",
-    "strategy": "FXALEXG",
-    "trade_key": "USD_CHF_2026-06-04_05:02",
-    "direction": "BUY",
-    "entry": 0.79064,
-    "sl": 0.78787,
-    "tp1": 0.79341,
-    "tp2": 0.79849,
-    "tp3": 0.80133,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 0.79428,
-    "aoi_bottom": 0.78902,
-    "opened_at": "2026-06-04 05:02 UTC",
-    "opened_ts": 1780549361.90228
-  },
-  "NZD_USD_2026-06-04_05:02": {
-    "pair": "NZD_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "NZD_USD_2026-06-04_05:02",
-    "direction": "SELL",
-    "entry": 0.5873,
-    "sl": 0.58858,
-    "tp1": 0.58602,
-    "tp2": 0.57766,
-    "tp3": 0.57534,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 0.58743,
-    "aoi_bottom": 0.58259,
-    "opened_at": "2026-06-04 05:02 UTC",
-    "opened_ts": 1780549365.425631
-  },
   "AP15R_USD_CAD_2026-06-04_05:03": {
     "pair": "USD_CAD",
     "strategy": "ALL_PAIRS_15R",
@@ -124,5 +73,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-06-04 05:03 UTC",
     "opened_ts": 1780549383.347533
+  },
+  "NZD_USD_2026-06-04_12:02": {
+    "pair": "NZD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "NZD_USD_2026-06-04_12:02",
+    "direction": "SELL",
+    "entry": 0.58849,
+    "sl": 0.59256,
+    "tp1": 0.58442,
+    "tp2": 0.57766,
+    "tp3": 0.57534,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.59136,
+    "aoi_bottom": 0.58879,
+    "opened_at": "2026-06-04 12:02 UTC",
+    "opened_ts": 1780574562.634151
   }
 }
