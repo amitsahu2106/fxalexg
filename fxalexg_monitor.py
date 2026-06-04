@@ -1,4 +1,3 @@
-
 """
 FXAlexG + ICT Killzone Monitor
 ================================
@@ -1046,39 +1045,41 @@ def check_active_trades():
 
         strategy = trade.get('strategy', 'FXALEXG')
         if strategy == 'GOLD_2R':
-            strategy_label = 'Gold 2R Strategy'
+            badge = '🏅 <b>GOLD 2R</b>'
         elif strategy == 'ALL_PAIRS_15R':
-            strategy_label = 'All Pairs 1.5R Strategy'
+            badge = '⚡ <b>1.5R STRATEGY</b>'
         else:
-            strategy_label = 'FXAlexG Strategy'
-        # Convert opened_at from UTC to IST for display
+            badge = '🎯 <b>FXALEXG</b>'
+        dir_arrow = '📈' if direction == 'BUY' else '📉'
         try:
             opened_dt  = datetime.strptime(opened_at[:16], '%Y-%m-%d %H:%M').replace(tzinfo=timezone.utc)
             opened_ist = (opened_dt + timedelta(hours=5, minutes=30)).strftime('%d %b %I:%M %p IST')
         except:
             opened_ist = opened_at
-        header = (strategy_label + NL +
-                  pair.replace('_', '/') + ' ' + direction +
-                  ' [' + opened_ist + ']' + NL)
+        pair_disp = pair.replace('_', '/')
+        header = (badge + ' | ' + dir_arrow + ' <b>' + pair_disp + ' ' + direction + '</b>' + NL +
+                  '🕐 ' + opened_ist + NL)
 
         if tp3_hit:
-            send_telegram('TP3 HIT - MAX TARGET ' + NL + header +
-                'Entry: ' + str(entry) + NL +
-                'TP3: ' + str(tp3) + NL +
-                'Profit: ' + pips_str + ' (' + rr_str + ')' + NL +
-                'Trade fully closed. Excellent!')
+            send_telegram(
+                '🏆 <b>TP3 HIT - MAX TARGET</b>' + NL + header +
+                '▫️ Entry: ' + str(entry) + '  →  TP3: ' + str(tp3) + NL +
+                '💰 <b>' + pips_str + '</b>  (' + rr_str + ')' + NL +
+                '✅ Trade closed. Excellent!')
             remove_trade(trade_key)
             print('  TP3 hit - removed: ' + trade_key)
 
         elif sl_hit:
             if tp1_hit:
-                send_telegram('CLOSED AT BREAKEVEN ' + NL + header +
-                    'TP1 was secured. Closed at entry. 0 loss.')
+                send_telegram(
+                    '🔒 <b>CLOSED AT BREAKEVEN</b>' + NL + header +
+                    '✅ TP1 profit secured. Closed at entry.' + NL +
+                    '📊 Net: 0 pips (0R)')
             else:
-                send_telegram('SL HIT ' + NL + header +
-                    'Entry: ' + str(entry) + NL +
-                    'SL: ' + str(price) + NL +
-                    'Loss: ' + pips_str + ' (' + rr_str + ')')
+                send_telegram(
+                    '🛑 <b>SL HIT</b>' + NL + header +
+                    '▫️ Entry: ' + str(entry) + '  →  SL: ' + str(price) + NL +
+                    '📊 <b>' + pips_str + '</b>  (' + rr_str + ')')
             remove_trade(trade_key)
             print('  SL/BE hit - removed: ' + trade_key)
 
@@ -1091,11 +1092,11 @@ def check_active_trades():
             if trade_key in trades:
                 trades[trade_key]['tp2_hit'] = True
                 save_trades(trades)
-            send_telegram('TP2 HIT ' + NL + header +
-                'Entry: ' + str(entry) + NL +
-                'TP2: ' + str(tp2) + NL +
-                'Profit: ' + pips_str + ' (' + rr_str + ')' + NL +
-                'Watching TP3: ' + str(tp3))
+            send_telegram(
+                '🎯 <b>TP2 HIT</b>' + NL + header +
+                '▫️ Entry: ' + str(entry) + '  →  TP2: ' + str(tp2) + NL +
+                '💰 <b>' + pips_str + '</b>  (' + rr_str + ')' + NL +
+                '👀 TP3: ' + str(tp3))
             print('  TP2 hit - watching TP3: ' + trade_key)
 
         elif tp1_newly_hit:
@@ -1103,27 +1104,29 @@ def check_active_trades():
             if trade_key in trades:
                 trades[trade_key]['tp1_hit'] = True
                 save_trades(trades)
-            send_telegram('TP1 HIT ' + NL + header +
-                'Entry: ' + str(entry) + NL +
-                'TP1: ' + str(tp1) + NL +
-                'Profit: ' + pips_str + ' (' + rr_str + ')' + NL +
-                'SL moved to breakeven. Watching TP2: ' + str(tp2))
+            send_telegram(
+                '✅ <b>TP1 HIT</b>' + NL + header +
+                '▫️ Entry: ' + str(entry) + '  →  TP1: ' + str(tp1) + NL +
+                '💰 <b>' + pips_str + '</b>  (' + rr_str + ')' + NL +
+                '🔒 SL → Breakeven  |  👀 TP2: ' + str(tp2))
             print('  TP1 hit - SL to BE: ' + trade_key)
 
         else:
-            icon = '' if pips >= 0 else ''
+            icon = '📈' if pips >= 0 else '📉'
             if tp2_hit_f:
-                status = 'TP1+TP2 hit - watching TP3: ' + str(tp3)
+                next_target = '👀 TP3: ' + str(tp3)
             elif tp1_hit:
-                status = 'TP1 hit - SL at BE - watching TP2: ' + str(tp2)
+                next_target = '🔒 BE active  |  👀 TP2: ' + str(tp2)
             else:
-                status = 'Watching TP1: ' + str(tp1)
-            send_telegram(icon + ' Trade Update' + NL + header +
-                'Entry:   ' + str(entry) + NL +
-                'Current: ' + str(price) + NL +
-                'P&L:     ' + pips_str + ' (' + rr_str + ')' + NL +
-                'TP1: ' + str(tp1) + ' | TP2: ' + str(tp2) + ' | TP3: ' + str(tp3) + NL +
-                'SL: ' + str(effective_sl) + NL + status)
+                next_target = '👀 TP1: ' + str(tp1)
+            pnl_icon = '🟢' if pips >= 0 else '🔴'
+            send_telegram(
+                icon + ' <b>Trade Update</b>' + NL + header +
+                '▫️ In: <code>' + str(entry) + '</code>  Now: <code>' + str(price) + '</code>' + NL +
+                pnl_icon + ' P&L: <b>' + pips_str + '</b>  (' + rr_str + ')' + NL +
+                '🎯 ' + str(tp1) + ' / ' + str(tp2) + ' / ' + str(tp3) + NL +
+                '🛑 SL: ' + str(effective_sl) + NL +
+                next_target)
             print('  Update: ' + trade_key + ' ' + pips_str)
 
 
@@ -1331,19 +1334,31 @@ def analyse_fxalexg(pair):
     # Risk in pips
     risk_pips = round(abs(price - sl) / pip_size(pair), 1)
 
+    dir_arrow = '📈' if direction == 'BUY' else '📉'
+    score_bar = '🟩' * int(pts / 2) + '⬜' * (5 - int(pts / 2))
+    entry_line = (
+        'Entry Signal: ' + es['pattern'] + ' on ' + es_tf
+        if es else 'Waiting for entry signal'
+    )
+    # Format confluence reasons with bullet points
+    reasons_fmt = ""
+    for r in reasons:
+        reasons_fmt += "  • " + r + "\n"
+
     msg = (
-        emojis[emoji] + " <b>FXAlexG Alert</b>\n"
-        "<b>" + pair.replace('_', '/') + "  [" + grade + "]  Score: " + str(pts) + "/10</b>\n\n"
-        "Price: <code>" + str(price) + "</code>\n"
-        "Direction: " + direction + "\n"
-        "Time: " + ist_now() + "\n"
-        + es_line +
-        "\nSL:  <code>" + str(sl) + "</code> (risk " + str(risk_pips) + " pips)\n"
-        "TP1: <code>" + str(tp1) + "</code> (1R)\n"
-        "TP2: <code>" + str(tp2) + "</code> (mid next AOI)\n"
-        "TP3: <code>" + str(tp3) + "</code> (edge next AOI)\n"
-        "\n<b>Confluences:</b>\n" + reasons_txt + "\n"
-        "<b>Analysis:</b>\n" + analysis
+        emojis[emoji] + " 🎯 <b>FXALEXG ALERT</b>  [" + grade + "]\n"
+        + dir_arrow + " <b>" + pair.replace('_', '/') + "  " + direction + "</b>\n"
+        "📊 " + score_bar + "  <b>" + str(pts) + "/10</b>  |  🕐 " + ist_now() + "\n"
+        "━━━━━━━━━━━━━━━━\n"
+        "💵 Entry:  <code>" + str(price) + "</code>\n"
+        "🛑 SL:     <code>" + str(sl) + "</code>  (" + str(risk_pips) + " pips)\n"
+        "✅ TP1:   <code>" + str(tp1) + "</code>  (1R)\n"
+        "🎯 TP2:   <code>" + str(tp2) + "</code>  (2R)\n"
+        "🏆 TP3:   <code>" + str(tp3) + "</code>  (3R)\n"
+        "━━━━━━━━━━━━━━━━\n"
+        "📌 " + entry_line + "\n"
+        "\n<b>Confluences:</b>\n" + reasons_fmt +
+        "\n<b>Analysis:</b> " + analysis
     )
     send_telegram(msg)
 
@@ -1572,20 +1587,24 @@ def analyse_gold_2r():
     NL        = chr(10)
     pair_disp = pair.replace('_', '/')
 
+    dir_arrow = '📈' if trend_dir == 'BUY' else '📉'
     msg = (
-        '<b>Gold 2R Strategy Alert</b>' + NL +
-        '<b>' + pair_disp + ' ' + trend_dir + '</b>' + NL + NL +
-        'Time: ' + to_ist(now) + NL +
-        'Entry: <code>' + str(round(price, 2)) + '</code>' + NL +
-        'SL:  <code>' + str(round(sl, 2)) + '</code> (' + str(risk_pips) + ' pips)' + NL +
-        'TP1: <code>' + str(round(tp1, 2)) + '</code> (2R)' + NL +
-        'TP2: <code>' + str(round(tp2, 2)) + '</code> (3R)' + NL +
-        'TP3: <code>' + str(round(tp3, 2)) + '</code> (4R)' + NL + NL +
-        '<b>Setup:</b>' + NL +
-        'Daily trend: ' + trend_dir + ' (above EMA50)' + NL +
-        'H4 pullback to EMA50: confirmed' + NL +
-        'H1 entry candle: confirmed' + NL +
-        'RSI: ' + str(round(h1_rsi_val, 1) if h1_rsi_val else 0)
+        '🏅 <b>GOLD 2R ALERT</b>' + NL +
+        dir_arrow + ' <b>XAU/USD ' + trend_dir + '</b>  |  🕐 ' + to_ist(now) + NL +
+        '━━━━━━━━━━━━━━━━' + NL +
+        '💵 Entry: <code>' + str(round(price, 2)) + '</code>' + NL +
+        '🛑 SL:    <code>' + str(round(sl, 2)) + '</code>  (' + str(risk_pips) + ' pips)' + NL +
+        '✅ TP1:  <code>' + str(round(tp1, 2)) + '</code>  (2R)' + NL +
+        '🎯 TP2:  <code>' + str(round(tp2, 2)) + '</code>  (3R)' + NL +
+        '🏆 TP3:  <code>' + str(round(tp3, 2)) + '</code>  (4R)' + NL +
+        '━━━━━━━━━━━━━━━━' + NL +
+        '<b>Confluences:</b>' + NL +
+        '  • Daily trend: ' + trend_dir + ' (price ' + ('above' if trend_dir == 'BUY' else 'below') + ' 50 EMA)' + NL +
+        '  • EMA50: ' + str(round(ema50_val if ema50_val else 0, 2)) + '  |  Slope: ' + str(round(slope_pct if slope_pct else 0, 2)) + '%' + NL +
+        '  • H4 pullback to EMA50: confirmed' + NL +
+        '  • H4 EMA50: ' + str(round(h4_ema50, 2)) + NL +
+        '  • Entry TF: ' + entry_tf + '  |  RSI: ' + str(round(h1_rsi_val, 1) if h1_rsi_val else 0) + NL +
+        '  • ATR(14): ' + str(round(h4_atr_val, 2))
     )
     send_telegram(msg)
 
@@ -1835,20 +1854,23 @@ def analyse_all_pairs_15r(pair):
     NL        = chr(10)
     pair_disp = pair.replace('_', '/')
 
+    dir_arrow = '📈' if trend_dir == 'BUY' else '📉'
     msg = (
-        '<b>All Pairs 1.5R Strategy Alert</b>' + NL +
-        '<b>' + pair_disp + ' ' + trend_dir + '</b>' + NL + NL +
-        'Time: ' + to_ist(now) + NL +
-        'Entry: <code>' + str(round(price, 5)) + '</code>' + NL +
-        'SL:  <code>' + str(round(sl, 5)) + '</code> (' + str(risk_pips) + ' pips)' + NL +
-        'TP1: <code>' + str(round(tp1, 5)) + '</code> (1.5R)' + NL +
-        'TP2: <code>' + str(round(tp2, 5)) + '</code> (2.5R)' + NL +
-        'TP3: <code>' + str(round(tp3, 5)) + '</code> (3.5R)' + NL + NL +
-        '<b>Setup:</b>' + NL +
-        'Daily trend: ' + trend_dir + NL +
-        'H4 pullback to EMA50: confirmed' + NL +
-        'Entry TF: ' + entry_tf + NL +
-        'RSI: ' + str(round(h1_rsi_val, 1) if h1_rsi_val else 0)
+        '⚡ <b>ALL PAIRS 1.5R ALERT</b>' + NL +
+        dir_arrow + ' <b>' + pair_disp + ' ' + trend_dir + '</b>  |  🕐 ' + to_ist(now) + NL +
+        '━━━━━━━━━━━━━━━━' + NL +
+        '💵 Entry: <code>' + str(round(price, 5)) + '</code>' + NL +
+        '🛑 SL:    <code>' + str(round(sl, 5)) + '</code>  (' + str(risk_pips) + ' pips)' + NL +
+        '✅ TP1:  <code>' + str(round(tp1, 5)) + '</code>  (1.5R)' + NL +
+        '🎯 TP2:  <code>' + str(round(tp2, 5)) + '</code>  (2.5R)' + NL +
+        '🏆 TP3:  <code>' + str(round(tp3, 5)) + '</code>  (3.5R)' + NL +
+        '━━━━━━━━━━━━━━━━' + NL +
+        '<b>Confluences:</b>' + NL +
+        '  • Daily trend: ' + trend_dir + ' | EMA50 slope: ' + str(round(slope_pct, 3)) + '%' + NL +
+        '  • Daily EMA50: ' + str(round(ema50_val, 5)) + NL +
+        '  • H4 pullback to EMA50: confirmed' + NL +
+        '  • H4 EMA50: ' + str(round(h4_ema50, 5)) + '  |  ATR: ' + str(round(h4_atr_val, 5)) + NL +
+        '  • Entry TF: ' + entry_tf + '  |  RSI: ' + str(round(h1_rsi_val, 1) if h1_rsi_val else 0)
     )
     send_telegram(msg)
 
@@ -2068,9 +2090,14 @@ def send_news_alert():
         'Accept': 'application/json, text/plain, */*',
     }
 
-    now_utc    = datetime.now(timezone.utc)
-    win_start  = now_utc.replace(hour=8, minute=30, second=0, microsecond=0)
-    win_end    = win_start + timedelta(hours=24)
+    now_utc   = datetime.now(timezone.utc)
+    now_ist   = now_utc + timedelta(hours=5, minutes=30)
+    # Window: 2 PM IST today to 2 PM IST tomorrow = 08:30 UTC to 08:30 UTC next day
+    # Calculate window based on IST date, not UTC
+    ist_today = now_ist.replace(hour=14, minute=0, second=0, microsecond=0)
+    win_start = ist_today - timedelta(hours=5, minutes=30)  # convert 2PM IST to UTC
+    win_end   = win_start + timedelta(hours=24)
+    print('     Window: ' + str(win_start) + ' to ' + str(win_end))
 
     # Fetch this week + next week to cover window boundaries
     all_events = []
@@ -2152,8 +2179,17 @@ def send_news_alert():
 
     if not high_in_window:
         msg += 'No high impact events in this window.'
+        # Also print all high impact events found (outside window) for debug
+        all_high = [e for e in all_events if str(e.get('impact','')).strip().lower() == 'high']
+        print('     All high impact events in feed (regardless of window):')
+        for e in all_high[:10]:
+            raw_time = e.get('time', '')
+            utc_dt   = et_to_utc(e.get('date', ''), raw_time, now_utc)
+            print('       ' + e.get('date','') + ' ' + raw_time +
+                  ' -> UTC: ' + str(utc_dt) + ' | ' + e.get('currency','') +
+                  ' ' + e.get('title','') + ' [' + str(e.get('impact','')) + ']')
         send_telegram(msg)
-        return
+        return False   # No events found
 
     # Group by date
     seen_dates = []
@@ -2210,6 +2246,7 @@ def send_news_alert():
 
     send_telegram(msg)
     print('     News alert sent - ' + str(len(high_in_window)) + ' events')
+    return True   # Events found and sent
 
 
 def main():
@@ -2229,17 +2266,20 @@ def main():
     # Weekdays only (market open check above ensures this)
     # Uses a flag in trades.json to send only ONCE per day
     if now_utc.hour in (7, 8):
-        news_key = '_news_sent_' + now_utc.strftime('%Y-%m-%d')
+        # Only skip if we already sent a notification WITH actual events today
+        # If previous run sent "No events", allow re-check (events may appear later)
+        news_key_done = '_news_sent_with_events_' + now_utc.strftime('%Y-%m-%d')
         tr_check = load_trades()
-        if news_key not in tr_check:
+        if news_key_done not in tr_check:
             try:
-                send_news_alert()
-                tr_check[news_key] = now_utc.strftime('%H:%M UTC')
-                save_trades(tr_check)
+                had_events = send_news_alert()
+                if had_events:
+                    tr_check[news_key_done] = now_utc.strftime('%H:%M UTC')
+                    save_trades(tr_check)
             except Exception as e:
                 print("  ERROR News: " + str(e))
         else:
-            print("  News already sent today (" + tr_check[news_key] + ")")
+            print("  News with events already sent today (" + tr_check[news_key_done] + ")")
 
     print("\n--- Checking Active Trades ---")
     try:
@@ -2262,18 +2302,24 @@ def main():
     if scorecard:
         NL  = chr(10)
         sc_now = datetime.now(timezone.utc)
-        sc_msg = '<b>Market Scorecard ' + to_ist(sc_now) + '</b>' + NL
-        sc_msg += '(Needs 8.0+ for A+ alert)' + NL + NL
+        sc_msg = '📊 <b>MARKET SCORECARD</b>  ' + to_ist(sc_now) + NL
+        sc_msg += '━━━━━━━━━━━━━━━━' + NL
         for r in sorted(scorecard, key=lambda x: x['pts'], reverse=True):
             grade = r['grade']
             pts   = r['pts']
             pair  = r['pair']
             dir_  = r.get('direction', 'N/A') or 'NEUTRAL'
-            emoji = '' if grade == 'A+' else '' if grade == 'B+' else ''
-            sc_msg += (emoji + ' ' + pair.replace('_', '/').ljust(9) +
-                       ' ' + dir_.ljust(7) +
-                       ' [' + grade + '] ' +
-                       str(pts) + '/10' + NL)
+            d_icon = '📈' if dir_ == 'BULLISH' else '📉' if dir_ == 'BEARISH' else '➡️'
+            if grade == 'A+':
+                g_icon = '🟢'
+            elif grade == 'B+':
+                g_icon = '🟡'
+            else:
+                g_icon = '⚪'
+            sc_msg += (g_icon + ' ' + pair.replace('_', '/').ljust(8) +
+                       ' ' + d_icon + ' ' + dir_.ljust(7) +
+                       ' <b>[' + grade + ']</b> ' +
+                       str(pts) + NL)
         send_telegram(sc_msg)
         print('  Scorecard sent for ' + str(len(scorecard)) + ' pairs')
 
