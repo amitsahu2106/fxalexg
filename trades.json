@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1780585389.9968014,
+  "_ict_last_alert": 1780646570.683522,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -73,23 +73,6 @@
     "aoi_bottom": 0.58879,
     "opened_at": "2026-06-04 12:02 UTC",
     "opened_ts": 1780574562.634151
-  },
-  "USD_CHF_2026-06-04_21:02": {
-    "pair": "USD_CHF",
-    "strategy": "FXALEXG",
-    "trade_key": "USD_CHF_2026-06-04_21:02",
-    "direction": "BUY",
-    "entry": 0.78958,
-    "sl": 0.78756,
-    "tp1": 0.7916,
-    "tp2": 0.79849,
-    "tp3": 0.80133,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 0.79428,
-    "aoi_bottom": 0.78902,
-    "opened_at": "2026-06-04 21:02 UTC",
-    "opened_ts": 1780606975.249575
   },
   "AP15R_EUR_USD_2026-06-04_21:03": {
     "pair": "EUR_USD",
