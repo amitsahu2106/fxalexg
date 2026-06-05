@@ -16,7 +16,7 @@
     "tp1": 1.15651,
     "tp2": 1.11784,
     "tp3": 1.1164,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": 1.16433,
     "aoi_bottom": 1.15908,
@@ -67,7 +67,7 @@
     "tp1": 1.15548,
     "tp2": 1.15173,
     "tp3": 1.14798,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": null,
     "aoi_bottom": null,
@@ -141,5 +141,22 @@
     "aoi_bottom": 0.70841,
     "opened_at": "2026-06-05 14:02 UTC",
     "opened_ts": 1780668159.924305
+  },
+  "AP15R_EUR_USD_2026-06-05_15:03": {
+    "pair": "EUR_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_EUR_USD_2026-06-05_15:03",
+    "direction": "SELL",
+    "entry": 1.1559,
+    "sl": 1.16475,
+    "tp1": 1.14262,
+    "tp2": 1.13377,
+    "tp3": 1.12492,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-06-05 15:03 UTC",
+    "opened_ts": 1780671828.437602
   }
 }
