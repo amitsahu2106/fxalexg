@@ -2046,38 +2046,32 @@ NEWS_CURRENCY_PAIRS = {
     'ALL': ['EUR/USD', 'GBP/USD', 'USD/JPY', 'AUD/USD', 'USD/CHF', 'NZD/USD', 'USD/CAD', 'XAU/USD'],
 }
 
-def et_to_utc(date_str, time_str, now_utc):
-    # FF times are in Eastern Time (auto EDT/EST)
-    # date_str: 'MM-DD-YYYY', time_str: '8:30am' or '12:00pm' or 'All Day' or ''
-    NL = chr(10)
-    if not time_str or time_str.lower() in ('all day', 'tentative', ''):
+def parse_ff_datetime(date_str):
+    # FF JSON date format: "2026-06-07T05:15:00-04:00" (ISO 8601 with offset)
+    # Parse directly and convert to UTC
+    if not date_str:
         return None
     try:
-        time_str = time_str.strip().lower()
-        am_pm = 'am' if 'am' in time_str else 'pm'
-        time_str = time_str.replace('am', '').replace('pm', '').strip()
-        parts = time_str.split(':')
-        h = int(parts[0])
-        m = int(parts[1]) if len(parts) > 1 else 0
-        if am_pm == 'pm' and h != 12:
-            h += 12
-        if am_pm == 'am' and h == 12:
-            h = 0
-
-        # Parse date
-        mo, da, yr = date_str.split('-')
-        from datetime import datetime as dt
-        event_naive = dt(int(yr), int(mo), int(da), h, m)
-
-        # DST: EDT (UTC-4) from second Sunday March to first Sunday November
-        # Approximate: EDT if month 3(after 8th)-11(before 1st), else EST
-        month = int(mo)
-        is_edt = (month > 3 and month < 11) or (month == 3 and int(da) >= 8) or (month == 11 and int(da) < 1)
-        offset_hours = 4 if is_edt else 5
-        from datetime import timezone, timedelta
-        utc_time = event_naive + timedelta(hours=offset_hours)
-        return utc_time.replace(tzinfo=timezone.utc)
-    except:
+        # Python 3.7+ fromisoformat handles offset-aware datetimes
+        # But "-04:00" format may need fixing for older Python
+        ds = date_str.strip()
+        # Handle timezone offset: replace last ':' in offset e.g. -04:00
+        if len(ds) > 19 and (ds[-6] == '+' or ds[-6] == '-'):
+            # Has timezone offset like +00:00 or -04:00
+            dt_part   = ds[:19]           # 2026-06-07T05:15:00
+            tz_part   = ds[19:]           # -04:00
+            tz_hours  = int(tz_part[1:3])
+            tz_mins   = int(tz_part[4:6])
+            tz_sign   = 1 if tz_part[0] == '+' else -1
+            offset    = timedelta(hours=tz_hours * tz_sign, minutes=tz_mins * tz_sign)
+            naive     = datetime.strptime(dt_part, '%Y-%m-%dT%H:%M:%S')
+            aware     = naive.replace(tzinfo=timezone.utc) - offset
+            return aware
+        else:
+            # No offset - treat as UTC
+            naive = datetime.strptime(ds[:19], '%Y-%m-%dT%H:%M:%S')
+            return naive.replace(tzinfo=timezone.utc)
+    except Exception as e:
         return None
 
 def send_news_alert():
@@ -2092,12 +2086,16 @@ def send_news_alert():
 
     now_utc   = datetime.now(timezone.utc)
     now_ist   = now_utc + timedelta(hours=5, minutes=30)
-    # Window: 2 PM IST today to 2 PM IST tomorrow = 08:30 UTC to 08:30 UTC next day
-    # Calculate window based on IST date, not UTC
-    ist_today = now_ist.replace(hour=14, minute=0, second=0, microsecond=0)
-    win_start = ist_today - timedelta(hours=5, minutes=30)  # convert 2PM IST to UTC
-    win_end   = win_start + timedelta(hours=24)
-    print('     Window: ' + str(win_start) + ' to ' + str(win_end))
+    # Window: from NOW until 2 PM IST tomorrow
+    # This ensures we never miss events that are "today" 
+    win_start = now_utc  # start from right now
+    ist_tomorrow = (now_ist + timedelta(days=1)).replace(hour=14, minute=0, second=0, microsecond=0)
+    win_end   = ist_tomorrow - timedelta(hours=5, minutes=30)  # 2 PM IST tomorrow in UTC
+    # Minimum window of 20 hours
+    if (win_end - win_start).total_seconds() < 20 * 3600:
+        win_end = win_start + timedelta(hours=24)
+    print('     Window: ' + str(win_start.strftime('%Y-%m-%d %H:%M UTC')) + 
+          ' to ' + str(win_end.strftime('%Y-%m-%d %H:%M UTC')))
 
     # Fetch this week + next week to cover window boundaries
     all_events = []
@@ -2142,12 +2140,12 @@ def send_news_alert():
     skipped_time   = 0
     skipped_window = 0
     for e in all_events:
+        # FF JSON may use 'country' instead of 'currency'
         impact = str(e.get('impact', '')).strip().lower()
         if impact != 'high':
             skipped_impact += 1
             continue
-        raw_time = e.get('time', '')
-        utc_dt = et_to_utc(e.get('date', ''), raw_time, now_utc)
+        utc_dt = parse_ff_datetime(e.get('date', ''))
         if utc_dt is None:
             skipped_time += 1
             continue
@@ -2184,32 +2182,30 @@ def send_news_alert():
         print('     All high impact events in feed (regardless of window):')
         for e in all_high[:10]:
             raw_time = e.get('time', '')
-            utc_dt   = et_to_utc(e.get('date', ''), raw_time, now_utc)
+            utc_dt   = parse_ff_datetime(e.get('date', ''))
             print('       ' + e.get('date','') + ' ' + raw_time +
                   ' -> UTC: ' + str(utc_dt) + ' | ' + e.get('currency','') +
                   ' ' + e.get('title','') + ' [' + str(e.get('impact','')) + ']')
         send_telegram(msg)
         return False   # No events found
 
-    # Group by date
-    seen_dates = []
+    # Group by IST date (extract date from parsed datetime)
+    seen_ist_dates = []
     for e in high_in_window:
-        d = e.get('date', '')
-        if d not in seen_dates:
-            seen_dates.append(d)
+        ist_date = (e['_utc_dt'] + timedelta(hours=5, minutes=30)).strftime('%Y-%m-%d')
+        if ist_date not in seen_ist_dates:
+            seen_ist_dates.append(ist_date)
 
-    for date_key in seen_dates:
-        day_events = [e for e in high_in_window if e.get('date') == date_key]
+    for date_key in seen_ist_dates:
+        day_events = [e for e in high_in_window
+                      if (e['_utc_dt'] + timedelta(hours=5, minutes=30)).strftime('%Y-%m-%d') == date_key]
         if not day_events:
             continue
-        # Format date label
         try:
-            mo, da, yr = date_key.split('-')
-            from datetime import datetime as dt
-            d_obj = dt(int(yr), int(mo), int(da))
-            today = now_utc.date()
-            event_date = d_obj.date()
-            if event_date == today:
+            d_obj    = datetime.strptime(date_key, '%Y-%m-%d')
+            today    = (now_utc + timedelta(hours=5, minutes=30)).date()
+            evt_date = d_obj.date()
+            if evt_date == today:
                 day_label = d_obj.strftime('%d %b') + ' (Today)'
             else:
                 day_label = d_obj.strftime('%d %b') + ' (Tomorrow)'
@@ -2220,15 +2216,16 @@ def send_news_alert():
 
         for e in day_events:
             utc_dt   = e['_utc_dt']
-            currency = e.get('currency', '??')
+            # FF JSON uses 'country' field (not 'currency')
+            currency = (e.get('currency') or e.get('country') or '??').strip()
             title    = e.get('title', '??')
             forecast = e.get('forecast', '') or ''
             previous = e.get('previous', '') or ''
 
-            # Times
-            utc_str  = utc_dt.strftime('%H:%M UTC')
-            ist_dt   = utc_dt + timedelta(hours=5, minutes=30)
-            ist_str  = ist_dt.strftime('%I:%M %p IST')
+            # Times (from parsed ISO datetime)
+            utc_str = utc_dt.strftime('%H:%M UTC')
+            ist_dt  = utc_dt + timedelta(hours=5, minutes=30)
+            ist_str = ist_dt.strftime('%I:%M %p IST')
 
             # Affected pairs
             pairs = NEWS_CURRENCY_PAIRS.get(currency.upper(), [])
