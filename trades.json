@@ -73,5 +73,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-06-07 22:02 UTC",
     "opened_ts": 1780869762.947284
+  },
+  "NZD_USD_2026-06-08_00:02": {
+    "pair": "NZD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "NZD_USD_2026-06-08_00:02",
+    "direction": "SELL",
+    "entry": 0.57954,
+    "sl": 0.5819,
+    "tp1": 0.57718,
+    "tp2": 0.57194,
+    "tp3": 0.56914,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.57997,
+    "aoi_bottom": 0.57534,
+    "opened_at": "2026-06-08 00:02 UTC",
+    "opened_ts": 1780876958.623578
   }
 }
