@@ -74,23 +74,6 @@
     "opened_at": "2026-06-08 09:02 UTC",
     "opened_ts": 1780909352.99411
   },
-  "AUD_USD_2026-06-08_16:02": {
-    "pair": "AUD_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "AUD_USD_2026-06-08_16:02",
-    "direction": "SELL",
-    "entry": 0.70538,
-    "sl": 0.70731,
-    "tp1": 0.70345,
-    "tp2": 0.69571,
-    "tp3": 0.69282,
-    "tp1_hit": true,
-    "tp2_hit": false,
-    "aoi_top": 0.70521,
-    "aoi_bottom": 0.69946,
-    "opened_at": "2026-06-08 16:02 UTC",
-    "opened_ts": 1780934558.057898
-  },
   "AP15R_USD_CAD_2026-06-08_17:03": {
     "pair": "USD_CAD",
     "strategy": "ALL_PAIRS_15R",
