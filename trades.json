@@ -289,7 +289,7 @@
     "tp1": 1.33411,
     "tp2": 1.32083,
     "tp3": 1.31924,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": 1.33736,
     "aoi_bottom": 1.33242,
@@ -313,5 +313,22 @@
     "aoi_bottom": 0.69946,
     "opened_at": "2026-06-11 09:02 UTC",
     "opened_ts": 1781168565.333423
+  },
+  "GBP_USD_2026-06-11_13:02": {
+    "pair": "GBP_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "GBP_USD_2026-06-11_13:02",
+    "direction": "SELL",
+    "entry": 1.33614,
+    "sl": 1.33762,
+    "tp1": 1.33466,
+    "tp2": 1.32083,
+    "tp3": 1.31924,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 1.33565,
+    "aoi_bottom": 1.3307,
+    "opened_at": "2026-06-11 13:02 UTC",
+    "opened_ts": 1781182959.943506
   }
 }
