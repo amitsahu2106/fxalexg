@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1781254972.5679362,
+  "_ict_last_alert": 1781269403.892485,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -296,5 +296,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-06-12 06:03 UTC",
     "opened_ts": 1781244228.788995
+  },
+  "AP15R_USD_CHF_2026-06-12_13:03": {
+    "pair": "USD_CHF",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CHF_2026-06-12_13:03",
+    "direction": "BUY",
+    "entry": 0.79714,
+    "sl": 0.7935,
+    "tp1": 0.80259,
+    "tp2": 0.80623,
+    "tp3": 0.80987,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-06-12 13:03 UTC",
+    "opened_ts": 1781269410.620703
   }
 }
