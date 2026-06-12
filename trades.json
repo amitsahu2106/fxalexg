@@ -262,5 +262,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-06-12 00:03 UTC",
     "opened_ts": 1781222582.257848
+  },
+  "AP15R_USD_JPY_2026-06-12_02:03": {
+    "pair": "USD_JPY",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_JPY_2026-06-12_02:03",
+    "direction": "BUY",
+    "entry": 160.266,
+    "sl": 159.506,
+    "tp1": 161.406,
+    "tp2": 162.166,
+    "tp3": 162.926,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-06-12 02:03 UTC",
+    "opened_ts": 1781229787.077816
   }
 }
