@@ -16,7 +16,7 @@
 #   - TP: 1:2 RR (entry - 2 x risk)
 #
 # Entry valid until SL or TP hit (no expiry)
-# Timeframe: M1 | Period: last 6 months | All 8 FXAlexG FX pairs
+# Timeframe: M5 | Period: last 6 months | All 8 FXAlexG FX pairs
 # ═══════════════════════════════════════════════════════════════
 import requests, os, time
 from datetime import datetime, timezone, timedelta
@@ -47,7 +47,7 @@ def fetch_chunk(pair, from_dt):
     url     = OANDA_BASE_URL + '/v3/instruments/' + pair + '/candles'
     headers = {'Authorization': 'Bearer ' + OANDA_API_KEY}
     params  = {
-        'granularity': 'M1',
+        'granularity': 'M5',
         'from':        from_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
         'count':       5000,
         'price':       'M',
@@ -227,14 +227,14 @@ def main():
     NL  = chr(10)
     SEP = '=' * 70
     print(SEP)
-    print('  MARUBOZU CONTINUATION PULLBACK BACKTEST (M1, 6 months, RR 1:2)')
+    print('  MARUBOZU CONTINUATION PULLBACK BACKTEST (M5, 6 months, RR 1:2)')
     print(SEP)
 
     all_trades = []
     per_pair   = {}
 
     for pair in PAIRS:
-        print(NL + 'Fetching ' + pair + ' M1 (6 months)...')
+        print(NL + 'Fetching ' + pair + ' M5 (6 months)...')
         candles = fetch_6months(pair)
         print('  Candles: ' + str(len(candles)))
         if len(candles) < 100:
@@ -286,7 +286,7 @@ def main():
 
     # ── Telegram summary ──
     tg  = '<b>Marubozu Continuation Pullback - M1 Backtest</b>' + NL
-    tg += 'Last 6 months | RR 1:2 | Zero-wick marubozu' + NL + NL
+    tg += 'M5 | Last 6 months | RR 1:2 | Zero-wick marubozu' + NL + NL
     tg += '<b>OVERALL:</b>' + NL
     tg += 'Trades: ' + str(total) + NL
     tg += 'Wins (TP): ' + str(len(tps)) + NL
