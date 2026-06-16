@@ -161,5 +161,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-06-15 23:03 UTC",
     "opened_ts": 1781564585.643273
+  },
+  "USD_CHF_2026-06-16_00:03": {
+    "pair": "USD_CHF",
+    "strategy": "FXALEXG",
+    "trade_key": "USD_CHF_2026-06-16_00:03",
+    "direction": "BUY",
+    "entry": 0.79454,
+    "sl": 0.78783,
+    "tp1": 0.80125,
+    "tp2": 0.8404,
+    "tp3": 0.84312,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.79428,
+    "aoi_bottom": 0.78902,
+    "opened_at": "2026-06-16 00:03 UTC",
+    "opened_ts": 1781568184.329746
   }
 }
