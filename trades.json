@@ -122,7 +122,7 @@
     "tp2": 1.32716,
     "tp3": 1.32213,
     "tp1_hit": true,
-    "tp2_hit": false,
+    "tp2_hit": true,
     "aoi_top": null,
     "aoi_bottom": null,
     "opened_at": "2026-06-16 05:02 UTC",
@@ -385,5 +385,22 @@
     "opened_at": "2026-06-18 01:02 UTC",
     "opened_ts": 1781744570.997067
   },
-  "_news_sent_with_events_2026-06-18": "07:02 UTC"
+  "_news_sent_with_events_2026-06-18": "07:02 UTC",
+  "AP15R_USD_CAD_2026-06-18_09:03": {
+    "pair": "USD_CAD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CAD_2026-06-18_09:03",
+    "direction": "BUY",
+    "entry": 1.41215,
+    "sl": 1.40016,
+    "tp1": 1.43013,
+    "tp2": 1.44212,
+    "tp3": 1.45411,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-06-18 09:03 UTC",
+    "opened_ts": 1781773414.061243
+  }
 }
