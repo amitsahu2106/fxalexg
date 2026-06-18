@@ -38,6 +38,11 @@ GEMINI_URL         = (
 
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID   = os.environ.get("TELEGRAM_CHAT_ID", "")
+# CallMeBot WhatsApp (free alternative when Telegram is blocked)
+WHATSAPP_PHONE     = os.environ.get("WHATSAPP_PHONE", "")    # e.g. +919876543210
+WHATSAPP_APIKEY    = os.environ.get("WHATSAPP_APIKEY", "")   # from CallMeBot
+# ntfy.sh (free push notifications - no signup needed)
+NTFY_TOPIC         = os.environ.get("NTFY_TOPIC", "")        # your unique topic name
 
 # ─────────────────────────────────────────────
 # STRATEGY 1 - FXALEXG SETTINGS
@@ -790,17 +795,72 @@ def ask_gemini_ict(data):
 # ─────────────────────────────────────────────
 # TELEGRAM SENDER
 # ─────────────────────────────────────────────
-def send_telegram(msg):
+def strip_html(text):
+    # WhatsApp does not support HTML - remove tags, keep content
+    import re
+    text = text.replace('<b>', '*').replace('</b>', '*')   # bold -> WhatsApp asterisks
+    text = text.replace('<code>', '').replace('</code>', '')
+    text = re.sub(r'<[^>]+>', '', text)                      # remove any other tags
+    return text
+
+def send_whatsapp(msg):
+    if not WHATSAPP_PHONE or not WHATSAPP_APIKEY:
+        return
     try:
+        import urllib.parse
+        clean = strip_html(msg)
+        url = ('https://api.callmebot.com/whatsapp.php?phone=' +
+               urllib.parse.quote(WHATSAPP_PHONE) +
+               '&text=' + urllib.parse.quote(clean) +
+               '&apikey=' + WHATSAPP_APIKEY)
+        r = requests.get(url, timeout=30)
+        if r.status_code != 200:
+            print("  WhatsApp error " + str(r.status_code))
+    except Exception as e:
+        print("  WhatsApp failed: " + str(e))
+
+def send_ntfy(msg):
+    if not NTFY_TOPIC:
+        return
+    try:
+        clean = strip_html(msg)
+        # ntfy uses UTF-8 body; title is first line
+        lines = clean.split(chr(10))
+        title = lines[0][:100] if lines else 'FXAlexG Alert'
+        body  = clean
         r = requests.post(
-            "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/sendMessage",
-            json={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"},
+            'https://ntfy.sh/' + NTFY_TOPIC,
+            data=body.encode('utf-8'),
+            headers={
+                'Title': title.encode('ascii', 'ignore').decode('ascii'),
+                'Priority': 'default',
+                'Tags': 'chart_with_upwards_trend',
+            },
             timeout=30,
         )
         if r.status_code != 200:
-            print("  Telegram error " + str(r.status_code))
+            print("  ntfy error " + str(r.status_code))
     except Exception as e:
-        print("  Telegram failed: " + str(e))
+        print("  ntfy failed: " + str(e))
+
+def send_telegram(msg):
+    # Sends to ALL configured channels: Telegram + WhatsApp + ntfy
+    # Telegram
+    if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
+        try:
+            r = requests.post(
+                "https://api.telegram.org/bot" + TELEGRAM_BOT_TOKEN + "/sendMessage",
+                json={"chat_id": TELEGRAM_CHAT_ID, "text": msg, "parse_mode": "HTML"},
+                timeout=30,
+            )
+            if r.status_code != 200:
+                print("  Telegram error " + str(r.status_code))
+        except Exception as e:
+            print("  Telegram failed: " + str(e))
+    # WhatsApp (CallMeBot)
+    send_whatsapp(msg)
+    # ntfy.sh push
+    send_ntfy(msg)
 
 # ─────────────────────────────────────────────
 # TRADE TRACKER
