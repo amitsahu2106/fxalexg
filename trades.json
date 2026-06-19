@@ -368,5 +368,39 @@
     "aoi_bottom": null,
     "opened_at": "2026-06-18 19:03 UTC",
     "opened_ts": 1781809388.84705
+  },
+  "AP15R_AUD_USD_2026-06-19_00:03": {
+    "pair": "AUD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_AUD_USD_2026-06-19_00:03",
+    "direction": "SELL",
+    "entry": 0.70126,
+    "sl": 0.70446,
+    "tp1": 0.69646,
+    "tp2": 0.69326,
+    "tp3": 0.69006,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-06-19 00:03 UTC",
+    "opened_ts": 1781827381.697188
+  },
+  "AP15R_NZD_USD_2026-06-19_00:03": {
+    "pair": "NZD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_NZD_USD_2026-06-19_00:03",
+    "direction": "SELL",
+    "entry": 0.57544,
+    "sl": 0.5802,
+    "tp1": 0.5683,
+    "tp2": 0.56354,
+    "tp3": 0.55878,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-06-19 00:03 UTC",
+    "opened_ts": 1781827384.753673
   }
 }
