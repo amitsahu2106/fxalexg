@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1781856185.9673688,
+  "_ict_last_alert": 1781863390.2115312,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -419,5 +419,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-06-19 05:03 UTC",
     "opened_ts": 1781845380.601929
+  },
+  "AP15R_USD_CAD_2026-06-19_10:03": {
+    "pair": "USD_CAD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CAD_2026-06-19_10:03",
+    "direction": "BUY",
+    "entry": 1.41418,
+    "sl": 1.41043,
+    "tp1": 1.41981,
+    "tp2": 1.42357,
+    "tp3": 1.42732,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-06-19 10:03 UTC",
+    "opened_ts": 1781863399.203632
   }
 }
