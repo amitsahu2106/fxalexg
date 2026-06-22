@@ -9,23 +9,6 @@
   "_news_sent_with_events_2026-06-10": "07:02 UTC",
   "_news_sent_with_events_2026-06-11": "07:02 UTC",
   "_news_sent_with_events_2026-06-15": "07:02 UTC",
-  "AP15R_USD_JPY_2026-06-15_12:03": {
-    "pair": "USD_JPY",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_USD_JPY_2026-06-15_12:03",
-    "direction": "BUY",
-    "entry": 160.187,
-    "sl": 159.708,
-    "tp1": 160.9055,
-    "tp2": 161.3845,
-    "tp3": 161.8635,
-    "tp1_hit": true,
-    "tp2_hit": true,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-06-15 12:03 UTC",
-    "opened_ts": 1781524988.567482
-  },
   "AP15R_NZD_USD_2026-06-15_17:03": {
     "pair": "NZD_USD",
     "strategy": "ALL_PAIRS_15R",
