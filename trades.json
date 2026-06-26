@@ -66,5 +66,22 @@
     "opened_ts": 1782262971.674611
   },
   "_news_sent_with_events_2026-06-24": "07:02 UTC",
-  "_news_sent_with_events_2026-06-25": "07:02 UTC"
+  "_news_sent_with_events_2026-06-25": "07:02 UTC",
+  "AP15R_USD_CHF_2026-06-26_15:02": {
+    "pair": "USD_CHF",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CHF_2026-06-26_15:02",
+    "direction": "BUY",
+    "entry": 0.80917,
+    "sl": 0.80611,
+    "tp1": 0.81375,
+    "tp2": 0.81681,
+    "tp3": 0.81986,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-06-26 15:02 UTC",
+    "opened_ts": 1782486170.674874
+  }
 }
