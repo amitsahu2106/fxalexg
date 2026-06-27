@@ -1,15 +1,16 @@
 # ===================================================================
-# STRATEGY: Simplified iFVG Setup (Sanos' Inner Circle PDF)
-# Adapted from NQ futures to FXAlexG forex/XAU pairs.
-# See chat explanation for all definitions/assumptions made.
+# STRATEGY: ORB Sniper-Style Breakout (independent reimplementation)
+# Inspired by the publicly described concept of TradeX ORB Sniper v3.6.
+# NOT the actual proprietary algorithm (closed-source, inaccessible).
+# See chat for full list of assumptions made.
 #
-# Liquidity Sweep : M5 swing point (wick fractal) near a prior FVG,
-#                   swept by a wick that closes back the other side.
-# Delivery        : M1 inverse-FVG (iFVG) confirms direction.
-# FVG Size        : >= 0.03% of price (scaled equivalent of "9 points")
-# Targets         : nearest M5 swing beyond entry giving >=1.5R, else skip
-# SL              : just beyond the swept wick
-# No SMT / Premium-Discount bonus filter (optional in source PDF)
+# Modes tested : 5-min ORB and 15-min ORB
+# Sessions     : London open (07:00 UTC) and NY open (13:30 UTC)
+# Entry        : candle CLOSES beyond the opening range high/low
+# Wick filter  : breakout candle must close in outer 30% of its range
+# SL           : opposite side of the opening range
+# TP1 / TP2    : range height projected 1x / 2x from breakout point
+# One trade per session per pair (first breakout only)
 # ===================================================================
 import requests, os, time
 from datetime import datetime, timezone, timedelta
@@ -24,13 +25,17 @@ PAIRS = [
     'USD_CHF', 'NZD_USD', 'USD_CAD', 'XAU_USD'
 ]
 
-MIN_FVG_PCT   = 0.03    # minimum FVG size as % of price (scaled "9 points" rule)
-MIN_RR        = 1.5     # minimum reward:risk to accept a target
-SWEEP_LOOKBACK_M5   = 40   # how many M5 candles back to search for a validating FVG near a swing
-ENTRY_SEARCH_WINDOW = 120  # how many M1 candles forward to search for iFVG confirmation after a sweep
-TARGET_MAX_MULT     = 20   # cap target search distance at 20x risk (avoid unrealistic far targets)
+SESSIONS = {
+    'LONDON': 7,    # 07:00 UTC
+    'NY':     13,   # 13:30 UTC -> handled with minute offset below
+}
+SESSION_MINUTE = {'LONDON': 0, 'NY': 30}
 
-# --- PIP HELPERS ---------------------------------------------------
+RANGE_MODES   = [5, 15]   # minutes
+WICK_FILTER   = True
+WICK_MIN_BODY_POS = 0.30  # close must be in outer 30% of candle range
+
+# --- PIP HELPERS ----------------------------------------------------
 def pip_size(pair):
     if 'JPY' in pair: return 0.01
     if 'XAU' in pair: return 0.10
@@ -39,16 +44,12 @@ def pip_size(pair):
 def to_pips(diff, pair):
     return round(diff / pip_size(pair), 1)
 
-# --- FETCH CANDLES (chunked over 6 months) --------------------------
-def fetch_chunk(pair, granularity, from_dt):
+# --- FETCH M5 (chunked over 6 months) -------------------------------
+def fetch_chunk(pair, from_dt):
     url     = OANDA_BASE_URL + '/v3/instruments/' + pair + '/candles'
     headers = {'Authorization': 'Bearer ' + OANDA_API_KEY}
-    params  = {
-        'granularity': granularity,
-        'from':        from_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
-        'count':       5000,
-        'price':       'M',
-    }
+    params  = {'granularity': 'M5', 'from': from_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+               'count': 5000, 'price': 'M'}
     for attempt in range(3):
         try:
             r = requests.get(url, headers=headers, params=params, timeout=30)
@@ -71,14 +72,14 @@ def fetch_chunk(pair, granularity, from_dt):
             time.sleep(3)
     return []
 
-def fetch_period(pair, granularity, days=183):
+def fetch_6months(pair):
     now    = datetime.now(timezone.utc)
-    start  = now - timedelta(days=days)
+    start  = now - timedelta(days=183)
     all_c  = []
     cursor = start
     reqs   = 0
     while cursor < now:
-        chunk = fetch_chunk(pair, granularity, cursor)
+        chunk = fetch_chunk(pair, cursor)
         reqs += 1
         if not chunk:
             break
@@ -103,62 +104,45 @@ def fetch_period(pair, granularity, days=183):
 def time_to_dt(t):
     return datetime.strptime(t[:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
 
-# --- FVG DETECTION ---------------------------------------------------
-def detect_fvgs(candles):
-    # Standard ICT 3-candle FVG. Returns list of dicts with formation index = i (3rd candle)
-    fvgs = []
-    for i in range(2, len(candles)):
-        c1, c3 = candles[i-2], candles[i]
-        if c1['high'] < c3['low']:
-            fvgs.append({'type': 'bullish', 'top': c3['low'], 'bottom': c1['high'],
-                         'formed_i': i, 'inverted_i': None, 'inverted_to': None})
-        elif c1['low'] > c3['high']:
-            fvgs.append({'type': 'bearish', 'top': c1['low'], 'bottom': c3['high'],
-                         'formed_i': i, 'inverted_i': None, 'inverted_to': None})
-    return fvgs
+# --- BUILD OPENING RANGE for each session-day -----------------------
+def find_sessions(candles, session_hour, session_minute, range_minutes):
+    # Returns list of {range_start_i, range_end_i, high, low}
+    sessions = []
+    n_range_bars = range_minutes // 5   # how many M5 bars make up the range
+    i = 0
+    seen_days = set()
+    while i < len(candles):
+        dt = time_to_dt(candles[i]['time'])
+        day_key = dt.strftime('%Y-%m-%d') + '_' + str(session_hour)
+        if (dt.hour == session_hour and dt.minute == session_minute
+                and day_key not in seen_days
+                and dt.weekday() < 5):
+            seen_days.add(day_key)
+            range_end = i + n_range_bars
+            if range_end < len(candles):
+                window = candles[i:range_end]
+                sessions.append({
+                    'start_i': i,
+                    'end_i':   range_end,
+                    'high':    max(c['high'] for c in window),
+                    'low':     min(c['low']  for c in window),
+                })
+        i += 1
+    return sessions
 
-def mark_inversions(fvgs, candles):
-    # A bearish FVG inverts to bullish when a candle CLOSES above its top.
-    # A bullish FVG inverts to bearish when a candle CLOSES below its bottom.
-    for fvg in fvgs:
-        for j in range(fvg['formed_i'] + 1, len(candles)):
-            c = candles[j]
-            if fvg['type'] == 'bearish' and c['close'] > fvg['top']:
-                fvg['inverted_i']  = j
-                fvg['inverted_to'] = 'bullish'
-                break
-            if fvg['type'] == 'bullish' and c['close'] < fvg['bottom']:
-                fvg['inverted_i']  = j
-                fvg['inverted_to'] = 'bearish'
-                break
-    return fvgs
+# --- WICK REJECTION FILTER -------------------------------------------
+def passes_wick_filter(candle, direction):
+    rng = candle['high'] - candle['low']
+    if rng <= 0:
+        return True
+    if direction == 'BUY':
+        close_pos = (candle['close'] - candle['low']) / rng
+        return close_pos >= (1 - WICK_MIN_BODY_POS)
+    else:
+        close_pos = (candle['close'] - candle['low']) / rng
+        return close_pos <= WICK_MIN_BODY_POS
 
-# --- SWING POINTS (wick-based, for sweep detection) ------------------
-def swing_points_wick(candles, lookback=2):
-    highs, lows = [], []
-    for i in range(lookback, len(candles) - lookback):
-        window = candles[i-lookback:i+lookback+1]
-        if candles[i]['high'] == max(c['high'] for c in window):
-            highs.append({'i': i, 'price': candles[i]['high']})
-        if candles[i]['low'] == min(c['low'] for c in window):
-            lows.append({'i': i, 'price': candles[i]['low']})
-    return highs, lows
-
-# --- FIND FVG-VALIDATED SWINGS --------------------------------------
-def swing_near_fvg(swing_i, swing_price, fvgs, fvg_type_needed, pair, lookback=SWEEP_LOOKBACK_M5):
-    # Checks if an FVG of the needed type formed shortly before this swing, with the
-    # swing price sitting inside/near that FVG zone (proxy for "swing bounced from a FVG")
-    buffer = pip_size(pair) * 10
-    for fvg in fvgs:
-        if fvg['type'] != fvg_type_needed:
-            continue
-        if not (swing_i - lookback <= fvg['formed_i'] <= swing_i):
-            continue
-        if fvg['bottom'] - buffer <= swing_price <= fvg['top'] + buffer:
-            return True
-    return False
-
-# --- TRADE SIMULATION (no expiry, wick-based fills) -----------------
+# --- SIMULATE TRADE (wick-based, no expiry within remaining session) -
 def simulate(direction, entry, sl, tp, future):
     for c in future:
         if direction == 'BUY':
@@ -173,157 +157,74 @@ def simulate(direction, entry, sl, tp, future):
                 return 'TP', tp
     return 'OPEN', future[-1]['close'] if future else entry
 
-# --- BACKTEST ONE PAIR ----------------------------------------------
-def backtest_pair(pair, m1, m5):
-    print('  Detecting M5 FVGs + swings...')
-    fvgs_m5          = detect_fvgs(m5)
-    highs_m5, lows_m5 = swing_points_wick(m5, lookback=2)
-
-    print('  Detecting M1 FVGs + inversions...')
-    fvgs_m1 = detect_fvgs(m1)
-    fvgs_m1 = mark_inversions(fvgs_m1, m1)
-    # Index M1 fvgs by inversion bar for fast lookup
-    inv_by_bar = {}
-    for fvg in fvgs_m1:
-        if fvg['inverted_i'] is not None:
-            inv_by_bar.setdefault(fvg['inverted_i'], []).append(fvg)
-
-    # Build M1 time -> index map for aligning M5 sweep time to M1 bars
-    m1_times = [time_to_dt(c['time']) for c in m1]
-
-    def m1_index_at_or_after(target_dt):
-        lo, hi = 0, len(m1_times) - 1
-        while lo < hi:
-            mid = (lo + hi) // 2
-            if m1_times[mid] < target_dt:
-                lo = mid + 1
-            else:
-                hi = mid
-        return lo
-
+# --- BACKTEST ONE PAIR / SESSION / RANGE MODE ------------------------
+def backtest_combo(pair, candles, session_name, session_hour, session_minute, range_minutes):
+    sessions = find_sessions(candles, session_hour, session_minute, range_minutes)
     trades = []
-    used_sweep_bars = set()
 
-    # --- BULLISH sweeps: validated swing LOWS swept then bullish iFVG on M1 ---
-    for low in lows_m5:
-        si, sp = low['i'], low['price']
-        if not swing_near_fvg(si, sp, fvgs_m5, 'bullish', pair):
+    for sess in sessions:
+        end_i = sess['end_i']
+        high, low = sess['high'], sess['low']
+        range_height = high - low
+        if range_height <= 0:
             continue
-        # Search forward on M5 for a sweep+reversal candle
-        for j in range(si + 1, min(si + 60, len(m5))):
-            c = m5[j]
-            if c['low'] < sp and c['close'] > sp:
-                # Sweep confirmed at M5 bar j
-                if j in used_sweep_bars:
-                    break
-                used_sweep_bars.add(j)
-                sweep_dt = time_to_dt(c['time'])
-                m1_start = m1_index_at_or_after(sweep_dt)
-                # Search M1 forward for a bullish inversion (iFVG) confirmation
-                for k in range(m1_start, min(m1_start + ENTRY_SEARCH_WINDOW, len(m1))):
-                    if k in inv_by_bar:
-                        for fvg in inv_by_bar[k]:
-                            if fvg['inverted_to'] != 'bullish':
-                                continue
-                            size_pct = (fvg['top'] - fvg['bottom']) / m1[k]['close'] * 100
-                            if size_pct < MIN_FVG_PCT:
-                                continue
-                            entry = m1[k]['close']
-                            sl    = sp - pip_size(pair) * 2   # buffer beyond swept low
-                            risk  = entry - sl
-                            if risk <= 0:
-                                continue
-                            # Find target: nearest M5 swing HIGH beyond entry giving >=MIN_RR
-                            target = None
-                            for h in highs_m5:
-                                if h['i'] <= si:
-                                    continue
-                                if h['price'] <= entry:
-                                    continue
-                                rr = (h['price'] - entry) / risk
-                                if rr >= MIN_RR and (h['price'] - entry) <= risk * TARGET_MAX_MULT:
-                                    target = h['price']
-                                    break
-                            if target is None:
-                                break  # no clear target -> skip trade entirely
-                            future = m1[k+1:k+1+5000]
-                            result, exit_px = simulate('BUY', entry, sl, target, future)
-                            if result == 'OPEN':
-                                break
-                            pips = (to_pips(target - entry, pair) if result == 'TP'
-                                    else -to_pips(entry - sl, pair))
-                            trades.append({
-                                'pair': pair, 'direction': 'BUY',
-                                'time': m1[k]['time'][:16].replace('T', ' '),
-                                'entry': round(entry, 5), 'sl': round(sl, 5),
-                                'tp': round(target, 5), 'rr': round((target-entry)/risk, 2),
-                                'fvg_pct': round(size_pct, 4),
-                                'result': result, 'pips': round(pips, 1),
-                            })
-                            break
-                        break
-                break
 
-    # --- BEARISH sweeps: validated swing HIGHS swept then bearish iFVG on M1 ---
-    for high in highs_m5:
-        si, sp = high['i'], high['price']
-        if not swing_near_fvg(si, sp, fvgs_m5, 'bearish', pair):
-            continue
-        for j in range(si + 1, min(si + 60, len(m5))):
-            c = m5[j]
-            if c['high'] > sp and c['close'] < sp:
-                if j in used_sweep_bars:
-                    break
-                used_sweep_bars.add(j)
-                sweep_dt = time_to_dt(c['time'])
-                m1_start = m1_index_at_or_after(sweep_dt)
-                for k in range(m1_start, min(m1_start + ENTRY_SEARCH_WINDOW, len(m1))):
-                    if k in inv_by_bar:
-                        for fvg in inv_by_bar[k]:
-                            if fvg['inverted_to'] != 'bearish':
-                                continue
-                            size_pct = (fvg['top'] - fvg['bottom']) / m1[k]['close'] * 100
-                            if size_pct < MIN_FVG_PCT:
-                                continue
-                            entry = m1[k]['close']
-                            sl    = sp + pip_size(pair) * 2
-                            risk  = sl - entry
-                            if risk <= 0:
-                                continue
-                            target = None
-                            for l in lows_m5:
-                                if l['i'] <= si:
-                                    continue
-                                if l['price'] >= entry:
-                                    continue
-                                rr = (entry - l['price']) / risk
-                                if rr >= MIN_RR and (entry - l['price']) <= risk * TARGET_MAX_MULT:
-                                    target = l['price']
-                                    break
-                            if target is None:
-                                break
-                            future = m1[k+1:k+1+5000]
-                            result, exit_px = simulate('SELL', entry, sl, target, future)
-                            if result == 'OPEN':
-                                break
-                            pips = (to_pips(entry - target, pair) if result == 'TP'
-                                    else -to_pips(sl - entry, pair))
-                            trades.append({
-                                'pair': pair, 'direction': 'SELL',
-                                'time': m1[k]['time'][:16].replace('T', ' '),
-                                'entry': round(entry, 5), 'sl': round(sl, 5),
-                                'tp': round(target, 5), 'rr': round((sl-entry)/risk*-1 if risk else 0, 2),
-                                'fvg_pct': round(size_pct, 4),
-                                'result': result, 'pips': round(pips, 1),
-                            })
-                            break
-                        break
+        traded_this_session = False
+        # Search forward up to end of trading day (next ~16h = 192 M5 bars) for first breakout
+        for j in range(end_i, min(end_i + 192, len(candles))):
+            if traded_this_session:
                 break
+            c = candles[j]
 
-    trades.sort(key=lambda t: t['time'])
+            direction = None
+            if c['close'] > high:
+                direction = 'BUY'
+            elif c['close'] < low:
+                direction = 'SELL'
+            if not direction:
+                continue
+            if WICK_FILTER and not passes_wick_filter(c, direction):
+                continue
+
+            entry = c['close']
+            if direction == 'BUY':
+                sl  = low
+                tp1 = entry + range_height
+                tp2 = entry + range_height * 2
+            else:
+                sl  = high
+                tp1 = entry - range_height
+                tp2 = entry - range_height * 2
+
+            risk = abs(entry - sl)
+            if risk <= 0:
+                continue
+
+            future = candles[j+1:j+1+5000]
+            result, exit_px = simulate(direction, entry, sl, tp1, future)
+            if result == 'OPEN':
+                break  # ran out of data, skip (rare, end of dataset)
+
+            if direction == 'BUY':
+                pips = (to_pips(tp1 - entry, pair) if result == 'TP'
+                        else -to_pips(entry - sl, pair))
+            else:
+                pips = (to_pips(entry - tp1, pair) if result == 'TP'
+                        else -to_pips(sl - entry, pair))
+
+            trades.append({
+                'pair': pair, 'session': session_name, 'mode': str(range_minutes) + 'm',
+                'time': c['time'][:16].replace('T', ' '),
+                'direction': direction,
+                'entry': round(entry, 5), 'sl': round(sl, 5), 'tp1': round(tp1, 5),
+                'range_pips': to_pips(range_height, pair),
+                'result': result, 'pips': round(pips, 1),
+            })
+            traded_this_session = True
+
     return trades
 
-# --- TELEGRAM --------------------------------------------------------
+# --- TELEGRAM ----------------------------------------------------------
 def send_telegram(msg):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return
@@ -334,34 +235,36 @@ def send_telegram(msg):
     except Exception as e:
         print('  Telegram error: ' + str(e))
 
-# --- MAIN -------------------------------------------------------------
+# --- MAIN ---------------------------------------------------------------
 def main():
     NL  = chr(10)
     SEP = '=' * 70
     print(SEP)
-    print('  SIMPLIFIED iFVG SETUP BACKTEST (6 months)')
-    print('  Sweep: M5 | Delivery/Entry: M1 | Min FVG: ' + str(MIN_FVG_PCT) + '% | Min RR: ' + str(MIN_RR))
+    print('  ORB SNIPER-STYLE BREAKOUT BACKTEST (independent reimplementation)')
+    print('  Modes: 5m / 15m ORB | Sessions: London 07:00 UTC, NY 13:30 UTC')
+    print('  Wick filter: ' + str(WICK_FILTER) + ' | TP1 = 1x range | TP2 = 2x range')
     print(SEP)
 
     all_trades = []
-    per_pair   = {}
+    summary    = {}  # key: (session, mode) -> list of trades
 
     for pair in PAIRS:
-        print(NL + 'Fetching ' + pair + '...')
-        m1 = fetch_period(pair, 'M1', days=183)
-        m5 = fetch_period(pair, 'M5', days=183)
-        print('  M1: ' + str(len(m1)) + '  M5: ' + str(len(m5)))
-        if len(m1) < 500 or len(m5) < 200:
+        print(NL + 'Fetching ' + pair + ' M5 (6 months)...')
+        candles = fetch_6months(pair)
+        print('  Candles: ' + str(len(candles)))
+        if len(candles) < 500:
             print('  Not enough data, skipping')
             continue
-        trades = backtest_pair(pair, m1, m5)
-        all_trades.extend(trades)
-        per_pair[pair] = trades
-        tps = [t for t in trades if t['result'] == 'TP']
-        wr  = round(len(tps) / len(trades) * 100, 1) if trades else 0
-        pl  = round(sum(t['pips'] for t in trades), 1)
-        print('  Trades: ' + str(len(trades)) + ' | WR: ' + str(wr) + '% | P&L: ' + str(pl) + 'p')
 
+        for session_name, s_hour in SESSIONS.items():
+            s_min = SESSION_MINUTE[session_name]
+            for r_min in RANGE_MODES:
+                trades = backtest_combo(pair, candles, session_name, s_hour, s_min, r_min)
+                all_trades.extend(trades)
+                key = (session_name, str(r_min) + 'm')
+                summary.setdefault(key, []).extend(trades)
+
+    # --- Overall ---
     total = len(all_trades)
     tps   = [t for t in all_trades if t['result'] == 'TP']
     sls   = [t for t in all_trades if t['result'] == 'SL']
@@ -372,18 +275,28 @@ def main():
     pf    = round(gw / gl, 2)
 
     print(NL + SEP)
-    print('  OVERALL RESULTS')
+    print('  OVERALL (all sessions, all modes, all pairs)')
     print(SEP)
     print('  Total trades: ' + str(total))
-    print('  Wins (TP):    ' + str(len(tps)))
-    print('  Losses (SL):  ' + str(len(sls)))
     print('  Win Rate:     ' + str(wr) + '%')
     print('  Total P&L:    ' + str(pl) + ' pips')
     print('  Profit Factor:' + str(pf))
 
+    print(NL + '  BY SESSION + MODE:')
+    for (session_name, mode), trades in summary.items():
+        if not trades:
+            continue
+        w  = [t for t in trades if t['result'] == 'TP']
+        wp = round(len(w) / len(trades) * 100, 1)
+        pp = round(sum(t['pips'] for t in trades), 1)
+        print('  ' + session_name.ljust(8) + mode.ljust(5) +
+              ' T:' + str(len(trades)).rjust(4) +
+              ' WR:' + str(wp).rjust(6) + '%' +
+              ' P&L:' + str(pp).rjust(9) + 'p')
+
     print(NL + '  BY PAIR:')
     for pair in PAIRS:
-        t = per_pair.get(pair, [])
+        t = [x for x in all_trades if x['pair'] == pair]
         if not t:
             print('  ' + pair.replace('_', '/').ljust(9) + ' no trades')
             continue
@@ -396,23 +309,22 @@ def main():
               ' WR:' + str(wp).rjust(6) + '%' +
               ' P&L:' + str(pp).rjust(9) + 'p')
 
-    tg  = '<b>Simplified iFVG Setup - 6mo Backtest</b>' + NL
-    tg += 'Sweep M5 | Entry/Delivery M1 | MinFVG ' + str(MIN_FVG_PCT) + '% | MinRR ' + str(MIN_RR) + NL + NL
+    # --- Telegram ---
+    tg  = '<b>ORB Sniper-Style Backtest (6mo)</b>' + NL
+    tg += '5m/15m ORB | London+NY open | Wick filter ON' + NL + NL
     tg += '<b>OVERALL:</b>' + NL
     tg += 'Trades: ' + str(total) + NL
     tg += 'Win Rate: <b>' + str(wr) + '%</b>' + NL
     tg += 'Total P&L: ' + str(pl) + ' pips' + NL
     tg += 'Profit Factor: ' + str(pf) + NL + NL
-    tg += '<b>BY PAIR:</b>' + NL
-    for pair in PAIRS:
-        t = per_pair.get(pair, [])
-        if not t:
-            tg += pair.replace('_', '/') + ': no trades' + NL
+    tg += '<b>BY SESSION+MODE:</b>' + NL
+    for (session_name, mode), trades in summary.items():
+        if not trades:
             continue
-        w  = [x for x in t if x['result'] == 'TP']
-        wp = round(len(w) / len(t) * 100, 1)
-        pp = round(sum(x['pips'] for x in t), 1)
-        tg += (pair.replace('_', '/') + ': T:' + str(len(t)) +
+        w  = [t for t in trades if t['result'] == 'TP']
+        wp = round(len(w) / len(trades) * 100, 1)
+        pp = round(sum(t['pips'] for t in trades), 1)
+        tg += (session_name + ' ' + mode + ': T:' + str(len(trades)) +
                ' WR:' + str(wp) + '% P&L:' + str(pp) + 'p' + NL)
     send_telegram(tg)
     print(NL + 'Done.')
