@@ -220,5 +220,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-07-01 00:02 UTC",
     "opened_ts": 1782864173.535666
+  },
+  "AP15R_AUD_USD_2026-07-01_01:02": {
+    "pair": "AUD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_AUD_USD_2026-07-01_01:02",
+    "direction": "SELL",
+    "entry": 0.69012,
+    "sl": 0.69328,
+    "tp1": 0.68538,
+    "tp2": 0.68222,
+    "tp3": 0.67906,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-01 01:02 UTC",
+    "opened_ts": 1782867776.741947
   }
 }
