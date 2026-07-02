@@ -239,5 +239,22 @@
     "opened_ts": 1782871372.658672
   },
   "_news_sent_with_events_2026-07-01": "07:02 UTC",
-  "_news_sent_with_events_2026-07-02": "07:02 UTC"
+  "_news_sent_with_events_2026-07-02": "07:02 UTC",
+  "AP15R_AUD_USD_2026-07-02_08:03": {
+    "pair": "AUD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_AUD_USD_2026-07-02_08:03",
+    "direction": "SELL",
+    "entry": 0.68904,
+    "sl": 0.6919,
+    "tp1": 0.68475,
+    "tp2": 0.68189,
+    "tp3": 0.67903,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-02 08:03 UTC",
+    "opened_ts": 1782979387.901089
+  }
 }
