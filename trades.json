@@ -104,5 +104,56 @@
     "opened_at": "2026-07-06 05:02 UTC",
     "opened_ts": 1783314165.227266
   },
-  "_news_sent_with_events_2026-07-06": "07:02 UTC"
+  "_news_sent_with_events_2026-07-06": "07:02 UTC",
+  "AP15R_EUR_USD_2026-07-06_09:02": {
+    "pair": "EUR_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_EUR_USD_2026-07-06_09:02",
+    "direction": "SELL",
+    "entry": 1.14206,
+    "sl": 1.14516,
+    "tp1": 1.13741,
+    "tp2": 1.13431,
+    "tp3": 1.13122,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-06 09:02 UTC",
+    "opened_ts": 1783328569.158403
+  },
+  "AP15R_NZD_USD_2026-07-06_09:02": {
+    "pair": "NZD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_NZD_USD_2026-07-06_09:02",
+    "direction": "SELL",
+    "entry": 0.56831,
+    "sl": 0.57172,
+    "tp1": 0.56319,
+    "tp2": 0.55978,
+    "tp3": 0.55637,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-06 09:02 UTC",
+    "opened_ts": 1783328577.281893
+  },
+  "AP15R_USD_CAD_2026-07-06_09:02": {
+    "pair": "USD_CAD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CAD_2026-07-06_09:02",
+    "direction": "BUY",
+    "entry": 1.42282,
+    "sl": 1.4189,
+    "tp1": 1.4287,
+    "tp2": 1.43262,
+    "tp3": 1.43654,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-06 09:02 UTC",
+    "opened_ts": 1783328579.290123
+  }
 }
