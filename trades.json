@@ -190,5 +190,39 @@
     "aoi_bottom": null,
     "opened_at": "2026-07-07 07:02 UTC",
     "opened_ts": 1783407770.753294
+  },
+  "AP15R_USD_CHF_2026-07-07_17:02": {
+    "pair": "USD_CHF",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CHF_2026-07-07_17:02",
+    "direction": "BUY",
+    "entry": 0.8071,
+    "sl": 0.80434,
+    "tp1": 0.81124,
+    "tp2": 0.814,
+    "tp3": 0.81676,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-07 17:02 UTC",
+    "opened_ts": 1783443772.469084
+  },
+  "AP15R_NZD_USD_2026-07-07_17:02": {
+    "pair": "NZD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_NZD_USD_2026-07-07_17:02",
+    "direction": "SELL",
+    "entry": 0.56862,
+    "sl": 0.57096,
+    "tp1": 0.56511,
+    "tp2": 0.56277,
+    "tp3": 0.56043,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-07 17:02 UTC",
+    "opened_ts": 1783443774.239523
   }
 }
