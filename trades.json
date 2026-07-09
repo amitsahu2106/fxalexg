@@ -225,5 +225,39 @@
     "aoi_bottom": 1.33897,
     "opened_at": "2026-07-09 07:02 UTC",
     "opened_ts": 1783580557.716428
+  },
+  "AP15R_USD_JPY_2026-07-09_11:02": {
+    "pair": "USD_JPY",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_JPY_2026-07-09_11:02",
+    "direction": "BUY",
+    "entry": 162.486,
+    "sl": 162.06761,
+    "tp1": 163.11359,
+    "tp2": 163.53198,
+    "tp3": 163.95038,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-09 11:02 UTC",
+    "opened_ts": 1783594976.40626
+  },
+  "AP15R_USD_CHF_2026-07-09_11:02": {
+    "pair": "USD_CHF",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CHF_2026-07-09_11:02",
+    "direction": "BUY",
+    "entry": 0.8076,
+    "sl": 0.80497,
+    "tp1": 0.81154,
+    "tp2": 0.81417,
+    "tp3": 0.81679,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-09 11:02 UTC",
+    "opened_ts": 1783594979.504778
   }
 }
