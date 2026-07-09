@@ -46,7 +46,7 @@
     "tp1": 1.34293,
     "tp2": 1.34855,
     "tp3": 1.3507,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": 1.33565,
     "aoi_bottom": 1.3307,
@@ -209,21 +209,21 @@
     "opened_ts": 1783458172.76537
   },
   "_news_sent_with_events_2026-07-08": "07:02 UTC",
-  "AP15R_USD_CHF_2026-07-08_21:02": {
-    "pair": "USD_CHF",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_USD_CHF_2026-07-08_21:02",
+  "GBP_USD_2026-07-09_07:02": {
+    "pair": "GBP_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "GBP_USD_2026-07-09_07:02",
     "direction": "BUY",
-    "entry": 0.80843,
-    "sl": 0.80588,
-    "tp1": 0.81226,
-    "tp2": 0.81481,
-    "tp3": 0.81737,
+    "entry": 1.34254,
+    "sl": 1.33714,
+    "tp1": 1.34794,
+    "tp2": 1.35496,
+    "tp3": 1.35681,
     "tp1_hit": false,
     "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-07-08 21:02 UTC",
-    "opened_ts": 1783544575.278801
+    "aoi_top": 1.34441,
+    "aoi_bottom": 1.33897,
+    "opened_at": "2026-07-09 07:02 UTC",
+    "opened_ts": 1783580557.716428
   }
 }
