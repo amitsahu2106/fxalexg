@@ -53,23 +53,6 @@
     "opened_at": "2026-07-02 09:02 UTC",
     "opened_ts": 1782982970.688211
   },
-  "AUD_USD_2026-07-02_15:02": {
-    "pair": "AUD_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "AUD_USD_2026-07-02_15:02",
-    "direction": "BUY",
-    "entry": 0.69351,
-    "sl": 0.69059,
-    "tp1": 0.69643,
-    "tp2": 0.70233,
-    "tp3": 0.70521,
-    "tp1_hit": true,
-    "tp2_hit": false,
-    "aoi_top": 0.69861,
-    "aoi_bottom": 0.69282,
-    "opened_at": "2026-07-02 15:02 UTC",
-    "opened_ts": 1783004563.268237
-  },
   "AP15R_USD_JPY_2026-07-06_05:02": {
     "pair": "USD_JPY",
     "strategy": "ALL_PAIRS_15R",
@@ -107,23 +90,6 @@
   },
   "_news_sent_with_events_2026-07-07": "07:02 UTC",
   "_news_sent_with_events_2026-07-08": "07:02 UTC",
-  "GBP_USD_2026-07-09_07:02": {
-    "pair": "GBP_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "GBP_USD_2026-07-09_07:02",
-    "direction": "BUY",
-    "entry": 1.34254,
-    "sl": 1.33714,
-    "tp1": 1.34794,
-    "tp2": 1.35496,
-    "tp3": 1.35681,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 1.34441,
-    "aoi_bottom": 1.33897,
-    "opened_at": "2026-07-09 07:02 UTC",
-    "opened_ts": 1783580557.716428
-  },
   "AUD_USD_2026-07-10_04:02": {
     "pair": "AUD_USD",
     "strategy": "FXALEXG",
