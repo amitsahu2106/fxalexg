@@ -192,5 +192,39 @@
     "aoi_bottom": 1.33897,
     "opened_at": "2026-07-13 00:02 UTC",
     "opened_ts": 1783900959.263523
+  },
+  "AP15R_USD_JPY_2026-07-13_01:02": {
+    "pair": "USD_JPY",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_JPY_2026-07-13_01:02",
+    "direction": "BUY",
+    "entry": 162.097,
+    "sl": 161.252,
+    "tp1": 163.3645,
+    "tp2": 164.2095,
+    "tp3": 165.0545,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-13 01:02 UTC",
+    "opened_ts": 1783904578.874244
+  },
+  "AP15R_AUD_USD_2026-07-13_01:03": {
+    "pair": "AUD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_AUD_USD_2026-07-13_01:03",
+    "direction": "SELL",
+    "entry": 0.69334,
+    "sl": 0.69681,
+    "tp1": 0.68813,
+    "tp2": 0.68467,
+    "tp3": 0.68119,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-13 01:03 UTC",
+    "opened_ts": 1783904580.864066
   }
 }
