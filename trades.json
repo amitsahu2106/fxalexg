@@ -73,23 +73,6 @@
   },
   "_news_sent_with_events_2026-07-07": "07:02 UTC",
   "_news_sent_with_events_2026-07-08": "07:02 UTC",
-  "AUD_USD_2026-07-10_04:02": {
-    "pair": "AUD_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "AUD_USD_2026-07-10_04:02",
-    "direction": "BUY",
-    "entry": 0.69604,
-    "sl": 0.69166,
-    "tp1": 0.70042,
-    "tp2": 0.71007,
-    "tp3": 0.71284,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 0.69861,
-    "aoi_bottom": 0.69282,
-    "opened_at": "2026-07-10 04:02 UTC",
-    "opened_ts": 1783656156.831844
-  },
   "_news_sent_with_events_2026-07-10": "07:02 UTC",
   "AP15R_USD_CHF_2026-07-10_14:02": {
     "pair": "USD_CHF",
