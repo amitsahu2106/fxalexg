@@ -14,23 +14,6 @@
   "_news_sent_with_events_2026-06-18": "07:02 UTC",
   "_news_sent_with_events_2026-06-22": "07:02 UTC",
   "_news_sent_with_events_2026-06-23": "07:02 UTC",
-  "AP15R_AUD_USD_2026-06-23_17:03": {
-    "pair": "AUD_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_AUD_USD_2026-06-23_17:03",
-    "direction": "SELL",
-    "entry": 0.69178,
-    "sl": 0.70083,
-    "tp1": 0.6782,
-    "tp2": 0.66915,
-    "tp3": 0.6601,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-06-23 17:03 UTC",
-    "opened_ts": 1782234184.273616
-  },
   "_news_sent_with_events_2026-06-24": "07:02 UTC",
   "_news_sent_with_events_2026-06-25": "07:02 UTC",
   "_news_sent_with_events_2026-06-30": "07:02 UTC",
@@ -73,40 +56,6 @@
     "aoi_bottom": null,
     "opened_at": "2026-07-10 14:02 UTC",
     "opened_ts": 1783692175.094931
-  },
-  "AP15R_EUR_USD_2026-07-10_21:02": {
-    "pair": "EUR_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_EUR_USD_2026-07-10_21:02",
-    "direction": "SELL",
-    "entry": 1.1415,
-    "sl": 1.14638,
-    "tp1": 1.13418,
-    "tp2": 1.1293,
-    "tp3": 1.12442,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-07-10 21:02 UTC",
-    "opened_ts": 1783717369.18944
-  },
-  "AP15R_EUR_USD_2026-07-12_21:02": {
-    "pair": "EUR_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_EUR_USD_2026-07-12_21:02",
-    "direction": "SELL",
-    "entry": 1.1415,
-    "sl": 1.14638,
-    "tp1": 1.13418,
-    "tp2": 1.1293,
-    "tp3": 1.12442,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-07-12 21:02 UTC",
-    "opened_ts": 1783890167.070973
   },
   "AP15R_USD_CHF_2026-07-12_21:02": {
     "pair": "USD_CHF",
@@ -194,22 +143,5 @@
     "opened_at": "2026-07-14 21:02 UTC",
     "opened_ts": 1784062977.243762
   },
-  "_news_sent_with_events_2026-07-15": "07:02 UTC",
-  "AP15R_USD_CHF_2026-07-15_10:02": {
-    "pair": "USD_CHF",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_USD_CHF_2026-07-15_10:02",
-    "direction": "BUY",
-    "entry": 0.81088,
-    "sl": 0.80576,
-    "tp1": 0.81856,
-    "tp2": 0.82368,
-    "tp3": 0.8288,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-07-15 10:02 UTC",
-    "opened_ts": 1784109778.60784
-  }
+  "_news_sent_with_events_2026-07-15": "07:02 UTC"
 }
