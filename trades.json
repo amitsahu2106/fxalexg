@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1784534579.3730175,
+  "_ict_last_alert": 1784552573.5793414,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -314,5 +314,39 @@
     "aoi_bottom": null,
     "opened_at": "2026-07-20 07:02 UTC",
     "opened_ts": 1784530973.663063
+  },
+  "AP15R_EUR_USD_2026-07-20_13:02": {
+    "pair": "EUR_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_EUR_USD_2026-07-20_13:02",
+    "direction": "SELL",
+    "entry": 1.14238,
+    "sl": 1.14526,
+    "tp1": 1.13806,
+    "tp2": 1.13518,
+    "tp3": 1.1323,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-20 13:02 UTC",
+    "opened_ts": 1784552574.380591
+  },
+  "AP15R_USD_CHF_2026-07-20_13:03": {
+    "pair": "USD_CHF",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CHF_2026-07-20_13:03",
+    "direction": "BUY",
+    "entry": 0.80882,
+    "sl": 0.80584,
+    "tp1": 0.81329,
+    "tp2": 0.81627,
+    "tp3": 0.81925,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-20 13:03 UTC",
+    "opened_ts": 1784552580.392131
   }
 }
