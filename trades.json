@@ -250,5 +250,22 @@
     "opened_at": "2026-07-26 22:02 UTC",
     "opened_ts": 1785103372.883722
   },
-  "_news_sent_with_events_2026-07-27": "07:02 UTC"
+  "_news_sent_with_events_2026-07-27": "07:02 UTC",
+  "AP15R_USD_CHF_2026-07-27_21:02": {
+    "pair": "USD_CHF",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CHF_2026-07-27_21:02",
+    "direction": "BUY",
+    "entry": 0.81926,
+    "sl": 0.8136,
+    "tp1": 0.82775,
+    "tp2": 0.83341,
+    "tp3": 0.83907,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-27 21:02 UTC",
+    "opened_ts": 1785186176.515353
+  }
 }
