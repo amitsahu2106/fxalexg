@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1784901768.9100993,
+  "_ict_last_alert": 1785139377.691067,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -249,23 +249,6 @@
     "aoi_bottom": 0.69812,
     "opened_at": "2026-07-24 15:02 UTC",
     "opened_ts": 1784905371.052793
-  },
-  "AP15R_USD_JPY_2026-07-24_15:03": {
-    "pair": "USD_JPY",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_USD_JPY_2026-07-24_15:03",
-    "direction": "BUY",
-    "entry": 163.758,
-    "sl": 163.42136,
-    "tp1": 164.26296,
-    "tp2": 164.59961,
-    "tp3": 164.93625,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-07-24 15:03 UTC",
-    "opened_ts": 1784905385.933319
   },
   "AUD_USD_2026-07-26_22:02": {
     "pair": "AUD_USD",
