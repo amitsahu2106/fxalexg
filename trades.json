@@ -252,5 +252,22 @@
     "opened_at": "2026-07-28 23:02 UTC",
     "opened_ts": 1785279772.397308
   },
-  "_news_sent_with_events_2026-07-29": "07:02 UTC"
+  "_news_sent_with_events_2026-07-29": "07:02 UTC",
+  "AP15R_USD_JPY_2026-07-29_13:02": {
+    "pair": "USD_JPY",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_JPY_2026-07-29_13:02",
+    "direction": "BUY",
+    "entry": 163.8,
+    "sl": 163.248,
+    "tp1": 164.628,
+    "tp2": 165.18,
+    "tp3": 165.732,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-29 13:02 UTC",
+    "opened_ts": 1785330177.176131
+  }
 }
