@@ -167,5 +167,39 @@
     "aoi_bottom": 1.33242,
     "opened_at": "2026-07-29 19:02 UTC",
     "opened_ts": 1785351765.076836
+  },
+  "EUR_USD_2026-07-30_05:02": {
+    "pair": "EUR_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "EUR_USD_2026-07-30_05:02",
+    "direction": "BUY",
+    "entry": 1.1451,
+    "sl": 1.14098,
+    "tp1": 1.14922,
+    "tp2": 1.15302,
+    "tp3": 1.1549,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 1.14642,
+    "aoi_bottom": 1.14329,
+    "opened_at": "2026-07-30 05:02 UTC",
+    "opened_ts": 1785387760.775829
+  },
+  "AP15R_USD_CHF_2026-07-30_05:03": {
+    "pair": "USD_CHF",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CHF_2026-07-30_05:03",
+    "direction": "BUY",
+    "entry": 0.81558,
+    "sl": 0.8123,
+    "tp1": 0.82049,
+    "tp2": 0.82377,
+    "tp3": 0.82704,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-07-30 05:03 UTC",
+    "opened_ts": 1785387780.913097
   }
 }
