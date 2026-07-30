@@ -100,5 +100,39 @@
     "aoi_bottom": null,
     "opened_at": "2026-07-30 11:02 UTC",
     "opened_ts": 1785409378.655075
+  },
+  "AUD_USD_2026-07-30_12:02": {
+    "pair": "AUD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "AUD_USD_2026-07-30_12:02",
+    "direction": "BUY",
+    "entry": 0.69825,
+    "sl": 0.69664,
+    "tp1": 0.69986,
+    "tp2": 0.70632,
+    "tp3": 0.70841,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.70136,
+    "aoi_bottom": 0.69812,
+    "opened_at": "2026-07-30 12:02 UTC",
+    "opened_ts": 1785412953.988534
+  },
+  "NZD_USD_2026-07-30_12:02": {
+    "pair": "NZD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "NZD_USD_2026-07-30_12:02",
+    "direction": "BUY",
+    "entry": 0.58432,
+    "sl": 0.58201,
+    "tp1": 0.58663,
+    "tp2": 0.59372,
+    "tp3": 0.59654,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.58879,
+    "aoi_bottom": 0.58352,
+    "opened_at": "2026-07-30 12:02 UTC",
+    "opened_ts": 1785412959.654257
   }
 }
