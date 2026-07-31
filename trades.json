@@ -118,23 +118,6 @@
     "opened_at": "2026-07-30 14:02 UTC",
     "opened_ts": 1785420171.740377
   },
-  "USD_JPY_2026-07-30_23:02": {
-    "pair": "USD_JPY",
-    "strategy": "FXALEXG",
-    "trade_key": "USD_JPY_2026-07-30_23:02",
-    "direction": "SELL",
-    "entry": 159.658,
-    "sl": 160.95532,
-    "tp1": 158.36068,
-    "tp2": 157.8165,
-    "tp3": 157.53,
-    "tp1_hit": true,
-    "tp2_hit": false,
-    "aoi_top": 159.749,
-    "aoi_bottom": 159.212,
-    "opened_at": "2026-07-30 23:02 UTC",
-    "opened_ts": 1785452557.354605
-  },
   "AP15R_USD_CAD_2026-07-30_23:02": {
     "pair": "USD_CAD",
     "strategy": "ALL_PAIRS_15R",
