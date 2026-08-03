@@ -78,7 +78,7 @@
     "tp1": 156.00836,
     "tp2": 154.42672,
     "tp3": 152.84508,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": 158.103,
     "aoi_bottom": 157.53,
