@@ -119,5 +119,22 @@
     "opened_at": "2026-08-03 06:02 UTC",
     "opened_ts": 1785736968.630803
   },
-  "_news_sent_with_events_2026-08-03": "07:02 UTC"
+  "_news_sent_with_events_2026-08-03": "07:02 UTC",
+  "AUD_USD_2026-08-03_12:02": {
+    "pair": "AUD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "AUD_USD_2026-08-03_12:02",
+    "direction": "BUY",
+    "entry": 0.70082,
+    "sl": 0.6969,
+    "tp1": 0.70474,
+    "tp2": 0.71287,
+    "tp3": 0.71526,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.70136,
+    "aoi_bottom": 0.69812,
+    "opened_at": "2026-08-03 12:02 UTC",
+    "opened_ts": 1785758566.502557
+  }
 }
