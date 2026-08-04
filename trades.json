@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1785769370.6433902,
+  "_ict_last_alert": 1785830572.5076678,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -103,5 +103,22 @@
     "opened_at": "2026-08-04 03:02 UTC",
     "opened_ts": 1785812556.973776
   },
-  "_news_sent_with_events_2026-08-04": "07:02 UTC"
+  "_news_sent_with_events_2026-08-04": "07:02 UTC",
+  "AP15R_GBP_USD_2026-08-04_08:02": {
+    "pair": "GBP_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_GBP_USD_2026-08-04_08:02",
+    "direction": "BUY",
+    "entry": 1.34363,
+    "sl": 1.33926,
+    "tp1": 1.35019,
+    "tp2": 1.35456,
+    "tp3": 1.35894,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-08-04 08:02 UTC",
+    "opened_ts": 1785830574.221936
+  }
 }
