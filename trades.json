@@ -155,23 +155,6 @@
     "opened_at": "2026-08-04 21:03 UTC",
     "opened_ts": 1785877406.262332
   },
-  "AP15R_GBP_USD_2026-08-05_10:02": {
-    "pair": "GBP_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_GBP_USD_2026-08-05_10:02",
-    "direction": "BUY",
-    "entry": 1.34668,
-    "sl": 1.34367,
-    "tp1": 1.3512,
-    "tp2": 1.35421,
-    "tp3": 1.35722,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-08-05 10:02 UTC",
-    "opened_ts": 1785924173.528214
-  },
   "AP15R_USD_CAD_2026-08-05_21:03": {
     "pair": "USD_CAD",
     "strategy": "ALL_PAIRS_15R",
