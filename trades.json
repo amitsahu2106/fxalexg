@@ -327,23 +327,6 @@
     "opened_at": "2026-08-10 07:02 UTC",
     "opened_ts": 1786345377.106665
   },
-  "AP15R_EUR_USD_2026-08-10_09:02": {
-    "pair": "EUR_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_EUR_USD_2026-08-10_09:02",
-    "direction": "BUY",
-    "entry": 1.15609,
-    "sl": 1.15361,
-    "tp1": 1.15981,
-    "tp2": 1.16229,
-    "tp3": 1.16477,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-08-10 09:02 UTC",
-    "opened_ts": 1786352571.073352
-  },
   "EUR_USD_2026-08-10_14:03": {
     "pair": "EUR_USD",
     "strategy": "FXALEXG",
