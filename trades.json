@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1786460601.9150832,
+  "_ict_last_alert": 1786521780.951008,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -257,23 +257,6 @@
     "aoi_bottom": null,
     "opened_at": "2026-08-10 06:03 UTC",
     "opened_ts": 1786341788.096127
-  },
-  "AP15R_NZD_USD_2026-08-10_06:03": {
-    "pair": "NZD_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_NZD_USD_2026-08-10_06:03",
-    "direction": "BUY",
-    "entry": 0.58905,
-    "sl": 0.5863,
-    "tp1": 0.59317,
-    "tp2": 0.59592,
-    "tp3": 0.59867,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-08-10 06:03 UTC",
-    "opened_ts": 1786341791.838631
   },
   "_news_sent_with_events_2026-08-10": "07:02 UTC",
   "AP15R_USD_CAD_2026-08-10_07:02": {
