@@ -259,23 +259,6 @@
     "opened_at": "2026-08-10 07:02 UTC",
     "opened_ts": 1786345377.106665
   },
-  "GBP_USD_2026-08-10_16:02": {
-    "pair": "GBP_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "GBP_USD_2026-08-10_16:02",
-    "direction": "BUY",
-    "entry": 1.35258,
-    "sl": 1.34743,
-    "tp1": 1.35773,
-    "tp2": 1.36288,
-    "tp3": 1.36803,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 1.35392,
-    "aoi_bottom": 1.34894,
-    "opened_at": "2026-08-10 16:02 UTC",
-    "opened_ts": 1786377774.618879
-  },
   "_news_sent_with_events_2026-08-12": "07:02 UTC",
   "EUR_USD_2026-08-12_15:02": {
     "pair": "EUR_USD",
@@ -293,5 +276,6 @@
     "aoi_bottom": 1.15115,
     "opened_at": "2026-08-12 15:02 UTC",
     "opened_ts": 1786546969.849465
-  }
+  },
+  "_news_sent_with_events_2026-08-13": "07:02 UTC"
 }
