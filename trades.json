@@ -50,7 +50,7 @@
     "tp1": 0.70919,
     "tp2": 0.71132,
     "tp3": 0.71345,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": null,
     "aoi_bottom": null,
