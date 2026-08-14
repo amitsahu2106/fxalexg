@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1786629778.9433424,
+  "_ict_last_alert": 1786694567.641279,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -124,5 +124,22 @@
     "aoi_bottom": 0.70685,
     "opened_at": "2026-08-14 06:02 UTC",
     "opened_ts": 1786687360.500606
+  },
+  "USD_JPY_2026-08-14_08:02": {
+    "pair": "USD_JPY",
+    "strategy": "FXALEXG",
+    "trade_key": "USD_JPY_2026-08-14_08:02",
+    "direction": "SELL",
+    "entry": 159.205,
+    "sl": 159.89375,
+    "tp1": 158.51625,
+    "tp2": 157.8165,
+    "tp3": 157.53,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 159.749,
+    "aoi_bottom": 159.212,
+    "opened_at": "2026-08-14 08:02 UTC",
+    "opened_ts": 1786694554.989911
   }
 }
