@@ -363,23 +363,6 @@
     "opened_at": "2026-08-17 01:03 UTC",
     "opened_ts": 1786928587.24026
   },
-  "AP15R_USD_JPY_2026-08-17_01:03": {
-    "pair": "USD_JPY",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_USD_JPY_2026-08-17_01:03",
-    "direction": "SELL",
-    "entry": 159.02,
-    "sl": 159.4535,
-    "tp1": 158.36975,
-    "tp2": 157.93625,
-    "tp3": 157.50275,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-08-17 01:03 UTC",
-    "opened_ts": 1786928588.935263
-  },
   "AP15R_USD_CAD_2026-08-17_01:03": {
     "pair": "USD_CAD",
     "strategy": "ALL_PAIRS_15R",
