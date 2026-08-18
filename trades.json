@@ -381,23 +381,6 @@
     "opened_ts": 1786942970.04711
   },
   "_news_sent_with_events_2026-08-17": "07:02 UTC",
-  "AP15R_AUD_USD_2026-08-18_00:03": {
-    "pair": "AUD_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_AUD_USD_2026-08-18_00:03",
-    "direction": "BUY",
-    "entry": 0.71084,
-    "sl": 0.70879,
-    "tp1": 0.71391,
-    "tp2": 0.71595,
-    "tp3": 0.718,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-08-18 00:03 UTC",
-    "opened_ts": 1787011396.781973
-  },
   "_news_sent_with_events_2026-08-18": "07:02 UTC",
   "AP15R_NZD_USD_2026-08-18_13:03": {
     "pair": "NZD_USD",
