@@ -331,5 +331,22 @@
   },
   "_news_sent_with_events_2026-08-17": "07:02 UTC",
   "_news_sent_with_events_2026-08-18": "07:02 UTC",
-  "_news_sent_with_events_2026-08-19": "07:02 UTC"
+  "_news_sent_with_events_2026-08-19": "07:02 UTC",
+  "AP15R_NZD_USD_2026-08-19_09:03": {
+    "pair": "NZD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_NZD_USD_2026-08-19_09:03",
+    "direction": "BUY",
+    "entry": 0.58766,
+    "sl": 0.58555,
+    "tp1": 0.59083,
+    "tp2": 0.59294,
+    "tp3": 0.59505,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-08-19 09:03 UTC",
+    "opened_ts": 1787130196.232972
+  }
 }
