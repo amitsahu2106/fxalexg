@@ -125,23 +125,6 @@
     "opened_at": "2026-08-14 08:02 UTC",
     "opened_ts": 1786694554.989911
   },
-  "AUD_USD_2026-08-14_09:02": {
-    "pair": "AUD_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "AUD_USD_2026-08-14_09:02",
-    "direction": "BUY",
-    "entry": 0.70728,
-    "sl": 0.70613,
-    "tp1": 0.70843,
-    "tp2": 0.71633,
-    "tp3": 0.71857,
-    "tp1_hit": true,
-    "tp2_hit": false,
-    "aoi_top": 0.71284,
-    "aoi_bottom": 0.70685,
-    "opened_at": "2026-08-14 09:02 UTC",
-    "opened_ts": 1786698160.739905
-  },
   "AP15R_NZD_USD_2026-08-14_09:03": {
     "pair": "NZD_USD",
     "strategy": "ALL_PAIRS_15R",
