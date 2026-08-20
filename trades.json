@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1787212969.8049123,
+  "_ict_last_alert": 1787230975.7337952,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -196,38 +196,21 @@
     "opened_at": "2026-08-20 09:03 UTC",
     "opened_ts": 1787216587.383492
   },
-  "NZD_USD_2026-08-20_10:02": {
+  "NZD_USD_2026-08-20_13:02": {
     "pair": "NZD_USD",
     "strategy": "FXALEXG",
-    "trade_key": "NZD_USD_2026-08-20_10:02",
+    "trade_key": "NZD_USD_2026-08-20_13:02",
     "direction": "BUY",
-    "entry": 0.59594,
-    "sl": 0.5943,
-    "tp1": 0.59758,
+    "entry": 0.59535,
+    "sl": 0.59413,
+    "tp1": 0.59657,
     "tp2": 0.60657,
     "tp3": 0.60916,
     "tp1_hit": false,
     "tp2_hit": false,
     "aoi_top": 0.59891,
     "aoi_bottom": 0.59544,
-    "opened_at": "2026-08-20 10:02 UTC",
-    "opened_ts": 1787220176.186697
-  },
-  "USD_CAD_2026-08-20_11:02": {
-    "pair": "USD_CAD",
-    "strategy": "FXALEXG",
-    "trade_key": "USD_CAD_2026-08-20_11:02",
-    "direction": "SELL",
-    "entry": 1.37685,
-    "sl": 1.37817,
-    "tp1": 1.37553,
-    "tp2": 1.36589,
-    "tp3": 1.36351,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 1.37667,
-    "aoi_bottom": 1.37357,
-    "opened_at": "2026-08-20 11:02 UTC",
-    "opened_ts": 1787223772.22308
+    "opened_at": "2026-08-20 13:02 UTC",
+    "opened_ts": 1787230966.313943
   }
 }
