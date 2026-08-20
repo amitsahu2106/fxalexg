@@ -229,5 +229,22 @@
     "aoi_bottom": 0.59544,
     "opened_at": "2026-08-20 10:02 UTC",
     "opened_ts": 1787220176.186697
+  },
+  "USD_CAD_2026-08-20_11:02": {
+    "pair": "USD_CAD",
+    "strategy": "FXALEXG",
+    "trade_key": "USD_CAD_2026-08-20_11:02",
+    "direction": "SELL",
+    "entry": 1.37685,
+    "sl": 1.37817,
+    "tp1": 1.37553,
+    "tp2": 1.36589,
+    "tp3": 1.36351,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 1.37667,
+    "aoi_bottom": 1.37357,
+    "opened_at": "2026-08-20 11:02 UTC",
+    "opened_ts": 1787223772.22308
   }
 }
