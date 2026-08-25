@@ -145,23 +145,6 @@
     "opened_at": "2026-08-20 09:03 UTC",
     "opened_ts": 1787216583.326278
   },
-  "AP15R_USD_CAD_2026-08-20_09:03": {
-    "pair": "USD_CAD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_USD_CAD_2026-08-20_09:03",
-    "direction": "SELL",
-    "entry": 1.37706,
-    "sl": 1.3864,
-    "tp1": 1.36305,
-    "tp2": 1.35371,
-    "tp3": 1.34437,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-08-20 09:03 UTC",
-    "opened_ts": 1787216587.383492
-  },
   "NZD_USD_2026-08-21_02:02": {
     "pair": "NZD_USD",
     "strategy": "FXALEXG",
@@ -212,5 +195,6 @@
     "aoi_bottom": null,
     "opened_at": "2026-08-24 01:02 UTC",
     "opened_ts": 1787533379.47418
-  }
+  },
+  "_news_sent_with_events_2026-08-25": "07:02 UTC"
 }
