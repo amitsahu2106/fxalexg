@@ -162,23 +162,6 @@
     "opened_at": "2026-08-21 02:02 UTC",
     "opened_ts": 1787277764.067274
   },
-  "AP15R_USD_JPY_2026-08-24_00:03": {
-    "pair": "USD_JPY",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_USD_JPY_2026-08-24_00:03",
-    "direction": "SELL",
-    "entry": 158.876,
-    "sl": 159.47493,
-    "tp1": 157.97761,
-    "tp2": 157.37868,
-    "tp3": 156.77975,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-08-24 00:03 UTC",
-    "opened_ts": 1787529781.364695
-  },
   "AP15R_AUD_USD_2026-08-24_01:02": {
     "pair": "AUD_USD",
     "strategy": "ALL_PAIRS_15R",
