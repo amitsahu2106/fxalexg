@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1787731404.7846007,
+  "_ict_last_alert": 1787749374.2404673,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -197,41 +197,7 @@
     "opened_at": "2026-08-25 13:03 UTC",
     "opened_ts": 1787662984.939788
   },
-  "AP15R_USD_CHF_2026-08-25_20:03": {
-    "pair": "USD_CHF",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_USD_CHF_2026-08-25_20:03",
-    "direction": "SELL",
-    "entry": 0.8013,
-    "sl": 0.80452,
-    "tp1": 0.79647,
-    "tp2": 0.79325,
-    "tp3": 0.79003,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-08-25 20:03 UTC",
-    "opened_ts": 1787688181.749743
-  },
   "_news_sent_with_events_2026-08-26": "07:02 UTC",
-  "USD_JPY_2026-08-26_09:02": {
-    "pair": "USD_JPY",
-    "strategy": "FXALEXG",
-    "trade_key": "USD_JPY_2026-08-26_09:02",
-    "direction": "SELL",
-    "entry": 159.012,
-    "sl": 159.25175,
-    "tp1": 158.77225,
-    "tp2": 157.444,
-    "tp3": 157.165,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 159.08,
-    "aoi_bottom": 158.553,
-    "opened_at": "2026-08-26 09:02 UTC",
-    "opened_ts": 1787734960.100103
-  },
   "AUD_USD_2026-08-26_10:02": {
     "pair": "AUD_USD",
     "strategy": "FXALEXG",
@@ -248,5 +214,22 @@
     "aoi_bottom": 0.71272,
     "opened_at": "2026-08-26 10:02 UTC",
     "opened_ts": 1787738565.335865
+  },
+  "USD_CHF_2026-08-26_13:02": {
+    "pair": "USD_CHF",
+    "strategy": "FXALEXG",
+    "trade_key": "USD_CHF_2026-08-26_13:02",
+    "direction": "BUY",
+    "entry": 0.80502,
+    "sl": 0.80231,
+    "tp1": 0.80773,
+    "tp2": 0.80916,
+    "tp3": 0.81013,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.80846,
+    "aoi_bottom": 0.80341,
+    "opened_at": "2026-08-26 13:02 UTC",
+    "opened_ts": 1787749364.773517
   }
 }
