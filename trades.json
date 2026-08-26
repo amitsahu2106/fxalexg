@@ -231,5 +231,22 @@
     "aoi_bottom": 158.553,
     "opened_at": "2026-08-26 09:02 UTC",
     "opened_ts": 1787734960.100103
+  },
+  "AUD_USD_2026-08-26_10:02": {
+    "pair": "AUD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "AUD_USD_2026-08-26_10:02",
+    "direction": "BUY",
+    "entry": 0.71815,
+    "sl": 0.71159,
+    "tp1": 0.72471,
+    "tp2": 0.73127,
+    "tp3": 0.73783,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.71857,
+    "aoi_bottom": 0.71272,
+    "opened_at": "2026-08-26 10:02 UTC",
+    "opened_ts": 1787738565.335865
   }
 }
