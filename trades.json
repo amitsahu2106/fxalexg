@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1787842975.9690652,
+  "_ict_last_alert": 1787904191.174532,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -334,5 +334,22 @@
     "opened_at": "2026-08-28 02:03 UTC",
     "opened_ts": 1787882580.820763
   },
-  "_news_sent_with_events_2026-08-28": "07:02 UTC"
+  "_news_sent_with_events_2026-08-28": "07:02 UTC",
+  "EUR_USD_2026-08-28_08:02": {
+    "pair": "EUR_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "EUR_USD_2026-08-28_08:02",
+    "direction": "SELL",
+    "entry": 1.16465,
+    "sl": 1.16495,
+    "tp1": 1.16435,
+    "tp2": 1.1617,
+    "tp3": 1.15908,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 1.16433,
+    "aoi_bottom": 1.15908,
+    "opened_at": "2026-08-28 08:02 UTC",
+    "opened_ts": 1787904169.33998
+  }
 }
