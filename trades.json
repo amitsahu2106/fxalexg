@@ -318,21 +318,21 @@
     "opened_at": "2026-08-28 09:02 UTC",
     "opened_ts": 1787907778.274374
   },
-  "EUR_USD_2026-08-28_12:02": {
+  "EUR_USD_2026-08-28_14:02": {
     "pair": "EUR_USD",
     "strategy": "FXALEXG",
-    "trade_key": "EUR_USD_2026-08-28_12:02",
+    "trade_key": "EUR_USD_2026-08-28_14:02",
     "direction": "SELL",
-    "entry": 1.16452,
-    "sl": 1.16509,
-    "tp1": 1.16395,
+    "entry": 1.16375,
+    "sl": 1.16529,
+    "tp1": 1.16221,
     "tp2": 1.15389,
     "tp3": 1.15115,
-    "tp1_hit": true,
+    "tp1_hit": false,
     "tp2_hit": false,
     "aoi_top": 1.16433,
     "aoi_bottom": 1.15908,
-    "opened_at": "2026-08-28 12:02 UTC",
-    "opened_ts": 1787918559.826703
+    "opened_at": "2026-08-28 14:02 UTC",
+    "opened_ts": 1787925769.355593
   }
 }
