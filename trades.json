@@ -242,7 +242,7 @@
     "tp1": 0.59612,
     "tp2": 0.60657,
     "tp3": 0.60916,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": 0.59891,
     "aoi_bottom": 0.59544,
@@ -299,5 +299,39 @@
     "aoi_bottom": 159.212,
     "opened_at": "2026-08-27 22:02 UTC",
     "opened_ts": 1787868165.448469
+  },
+  "NZD_USD_2026-08-28_02:02": {
+    "pair": "NZD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "NZD_USD_2026-08-28_02:02",
+    "direction": "BUY",
+    "entry": 0.59585,
+    "sl": 0.59464,
+    "tp1": 0.59706,
+    "tp2": 0.60657,
+    "tp3": 0.60916,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.59891,
+    "aoi_bottom": 0.59544,
+    "opened_at": "2026-08-28 02:02 UTC",
+    "opened_ts": 1787882566.23492
+  },
+  "AP15R_NZD_USD_2026-08-28_02:03": {
+    "pair": "NZD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_NZD_USD_2026-08-28_02:03",
+    "direction": "BUY",
+    "entry": 0.59585,
+    "sl": 0.59341,
+    "tp1": 0.59951,
+    "tp2": 0.60195,
+    "tp3": 0.60439,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-08-28 02:03 UTC",
+    "opened_ts": 1787882580.820763
   }
 }
