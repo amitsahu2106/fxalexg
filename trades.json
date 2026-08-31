@@ -232,5 +232,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-08-31 01:02 UTC",
     "opened_ts": 1788138174.401387
+  },
+  "AP15R_USD_CAD_2026-08-31_17:03": {
+    "pair": "USD_CAD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CAD_2026-08-31_17:03",
+    "direction": "SELL",
+    "entry": 1.38602,
+    "sl": 1.39155,
+    "tp1": 1.37772,
+    "tp2": 1.3722,
+    "tp3": 1.36666,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-08-31 17:03 UTC",
+    "opened_ts": 1788195782.550531
   }
 }
