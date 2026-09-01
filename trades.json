@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1788256972.0971823,
+  "_ict_last_alert": 1788267767.9946094,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -46,5 +46,22 @@
   "_news_sent_with_events_2026-08-25": "07:02 UTC",
   "_news_sent_with_events_2026-08-26": "07:02 UTC",
   "_news_sent_with_events_2026-08-28": "07:02 UTC",
-  "_news_sent_with_events_2026-09-01": "07:02 UTC"
+  "_news_sent_with_events_2026-09-01": "07:02 UTC",
+  "USD_CHF_2026-09-01_13:02": {
+    "pair": "USD_CHF",
+    "strategy": "FXALEXG",
+    "trade_key": "USD_CHF_2026-09-01_13:02",
+    "direction": "SELL",
+    "entry": 0.80994,
+    "sl": 0.81591,
+    "tp1": 0.80397,
+    "tp2": 0.79877,
+    "tp3": 0.79725,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.81482,
+    "aoi_bottom": 0.80962,
+    "opened_at": "2026-09-01 13:02 UTC",
+    "opened_ts": 1788267755.301926
+  }
 }
