@@ -65,21 +65,38 @@
     "opened_ts": 1788267755.301926
   },
   "_news_sent_with_events_2026-09-02": "07:02 UTC",
-  "USD_JPY_2026-09-02_12:02": {
-    "pair": "USD_JPY",
+  "EUR_USD_2026-09-02_14:02": {
+    "pair": "EUR_USD",
     "strategy": "FXALEXG",
-    "trade_key": "USD_JPY_2026-09-02_12:02",
-    "direction": "SELL",
-    "entry": 159.633,
-    "sl": 160.01182,
-    "tp1": 159.25418,
-    "tp2": 158.8165,
-    "tp3": 158.553,
+    "trade_key": "EUR_USD_2026-09-02_14:02",
+    "direction": "BUY",
+    "entry": 1.16044,
+    "sl": 1.15754,
+    "tp1": 1.16334,
+    "tp2": 1.16766,
+    "tp3": 1.16912,
     "tp1_hit": false,
     "tp2_hit": false,
-    "aoi_top": 159.749,
-    "aoi_bottom": 159.212,
-    "opened_at": "2026-09-02 12:02 UTC",
-    "opened_ts": 1788350553.06341
+    "aoi_top": 1.16433,
+    "aoi_bottom": 1.15908,
+    "opened_at": "2026-09-02 14:02 UTC",
+    "opened_ts": 1788357750.270899
+  },
+  "USD_JPY_2026-09-02_14:02": {
+    "pair": "USD_JPY",
+    "strategy": "FXALEXG",
+    "trade_key": "USD_JPY_2026-09-02_14:02",
+    "direction": "SELL",
+    "entry": 158.568,
+    "sl": 159.50386,
+    "tp1": 157.63214,
+    "tp2": 156.69628,
+    "tp3": 155.76042,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 159.08,
+    "aoi_bottom": 158.553,
+    "opened_at": "2026-09-02 14:02 UTC",
+    "opened_ts": 1788357756.262011
   }
 }
