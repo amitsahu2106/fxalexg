@@ -64,5 +64,22 @@
     "opened_at": "2026-09-01 13:02 UTC",
     "opened_ts": 1788267755.301926
   },
-  "_news_sent_with_events_2026-09-02": "07:02 UTC"
+  "_news_sent_with_events_2026-09-02": "07:02 UTC",
+  "USD_JPY_2026-09-02_12:02": {
+    "pair": "USD_JPY",
+    "strategy": "FXALEXG",
+    "trade_key": "USD_JPY_2026-09-02_12:02",
+    "direction": "SELL",
+    "entry": 159.633,
+    "sl": 160.01182,
+    "tp1": 159.25418,
+    "tp2": 158.8165,
+    "tp3": 158.553,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 159.749,
+    "aoi_bottom": 159.212,
+    "opened_at": "2026-09-02 12:02 UTC",
+    "opened_ts": 1788350553.06341
+  }
 }
