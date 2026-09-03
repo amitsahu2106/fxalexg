@@ -166,5 +166,22 @@
     "aoi_bottom": 157.165,
     "opened_at": "2026-09-03 07:02 UTC",
     "opened_ts": 1788418967.845751
+  },
+  "NZD_USD_2026-09-03_11:02": {
+    "pair": "NZD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "NZD_USD_2026-09-03_11:02",
+    "direction": "BUY",
+    "entry": 0.58661,
+    "sl": 0.58262,
+    "tp1": 0.5906,
+    "tp2": 0.59375,
+    "tp3": 0.59654,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.58874,
+    "aoi_bottom": 0.58391,
+    "opened_at": "2026-09-03 11:02 UTC",
+    "opened_ts": 1788433379.568814
   }
 }
