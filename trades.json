@@ -151,23 +151,6 @@
     "opened_ts": 1788465755.926264
   },
   "_news_sent_with_events_2026-09-04": "07:02 UTC",
-  "USD_CAD_2026-09-04_13:03": {
-    "pair": "USD_CAD",
-    "strategy": "FXALEXG",
-    "trade_key": "USD_CAD_2026-09-04_13:03",
-    "direction": "BUY",
-    "entry": 1.38666,
-    "sl": 1.38035,
-    "tp1": 1.39297,
-    "tp2": 1.39928,
-    "tp3": 1.40559,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 1.38739,
-    "aoi_bottom": 1.38212,
-    "opened_at": "2026-09-04 13:03 UTC",
-    "opened_ts": 1788527005.300676
-  },
   "AP15R_USD_JPY_2026-09-04_17:02": {
     "pair": "USD_JPY",
     "strategy": "ALL_PAIRS_15R",
