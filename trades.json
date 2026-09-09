@@ -303,5 +303,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-09-08 23:03 UTC",
     "opened_ts": 1788908580.073435
+  },
+  "AP15R_EUR_USD_2026-09-09_03:03": {
+    "pair": "EUR_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_EUR_USD_2026-09-09_03:03",
+    "direction": "BUY",
+    "entry": 1.1631,
+    "sl": 1.1605,
+    "tp1": 1.167,
+    "tp2": 1.1696,
+    "tp3": 1.1722,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-09-09 03:03 UTC",
+    "opened_ts": 1788922984.511885
   }
 }
