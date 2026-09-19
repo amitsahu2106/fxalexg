@@ -1,16 +1,21 @@
 # ===================================================================
-# STRATEGY: ORB Sniper-Style Breakout (independent reimplementation)
-# Inspired by the publicly described concept of TradeX ORB Sniper v3.6.
-# NOT the actual proprietary algorithm (closed-source, inaccessible).
-# See chat for full list of assumptions made.
+# STRATEGY: 5:30 AM IST (00:00 UTC) H1 Candle Range Breakout+Retrace
+# XAU/USD only
 #
-# Modes tested : 5-min ORB and 15-min ORB
-# Sessions     : London open (07:00 UTC) and NY open (13:30 UTC)
-# Entry        : candle CLOSES beyond the opening range high/low
-# Wick filter  : breakout candle must close in outer 30% of its range
-# SL           : opposite side of the opening range
-# TP1 / TP2    : range height projected 1x / 2x from breakout point
-# One trade per session per pair (first breakout only)
+# Range candle : the H1 candle starting 00:00 UTC (= 5:30 AM IST)
+# Long setup   : a later candle CLOSES above the range candle's HIGH
+#                -> wait for retrace down to 75% level of the range
+#                -> entry there, SL at 25% level, TP = 1:2 RR
+# Short setup  : a later candle CLOSES below the range candle's LOW
+#                -> wait for retrace up to 25% level of the range
+#                -> entry there, SL at 75% level, TP = 1:2 RR
+#
+# ASSUMPTIONS (flagging clearly):
+#  - Breakout confirmation and entry/retrace timing evaluated on M15
+#    candles (close-based breakout, wick-based retrace fill)
+#  - One trade per day maximum (first valid breakout+retrace only)
+#  - Entry stays valid until SL or TP is hit - no expiry
+#  - "75% of the candle" = low + 0.75*(high-low); "25%" = low + 0.25*(high-low)
 # ===================================================================
 import requests, os, time
 from datetime import datetime, timezone, timedelta
@@ -20,35 +25,14 @@ OANDA_BASE_URL     = 'https://api-fxpractice.oanda.com'
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_CHAT_ID   = os.environ.get('TELEGRAM_CHAT_ID', '')
 
-PAIRS = [
-    'EUR_USD', 'GBP_USD', 'USD_JPY', 'AUD_USD',
-    'USD_CHF', 'NZD_USD', 'USD_CAD', 'XAU_USD'
-]
+PAIR = 'XAU_USD'
+RANGE_CANDLE_UTC_HOUR = 0   # 00:00 UTC = 5:30 AM IST
 
-SESSIONS = {
-    'LONDON': 7,    # 07:00 UTC
-    'NY':     13,   # 13:30 UTC -> handled with minute offset below
-}
-SESSION_MINUTE = {'LONDON': 0, 'NY': 30}
-
-RANGE_MODES   = [5, 15]   # minutes
-WICK_FILTER   = True
-WICK_MIN_BODY_POS = 0.30  # close must be in outer 30% of candle range
-
-# --- PIP HELPERS ----------------------------------------------------
-def pip_size(pair):
-    if 'JPY' in pair: return 0.01
-    if 'XAU' in pair: return 0.10
-    return 0.0001
-
-def to_pips(diff, pair):
-    return round(diff / pip_size(pair), 1)
-
-# --- FETCH M5 (chunked over 6 months) -------------------------------
-def fetch_chunk(pair, from_dt):
+# --- FETCH (chunked) --------------------------------------------------
+def fetch_chunk(pair, granularity, from_dt):
     url     = OANDA_BASE_URL + '/v3/instruments/' + pair + '/candles'
     headers = {'Authorization': 'Bearer ' + OANDA_API_KEY}
-    params  = {'granularity': 'M5', 'from': from_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
+    params  = {'granularity': granularity, 'from': from_dt.strftime('%Y-%m-%dT%H:%M:%SZ'),
                'count': 5000, 'price': 'M'}
     for attempt in range(3):
         try:
@@ -72,14 +56,14 @@ def fetch_chunk(pair, from_dt):
             time.sleep(3)
     return []
 
-def fetch_6months(pair):
+def fetch_period(pair, granularity, days=183):
     now    = datetime.now(timezone.utc)
-    start  = now - timedelta(days=183)
+    start  = now - timedelta(days=days)
     all_c  = []
     cursor = start
     reqs   = 0
     while cursor < now:
-        chunk = fetch_chunk(pair, cursor)
+        chunk = fetch_chunk(pair, granularity, cursor)
         reqs += 1
         if not chunk:
             break
@@ -104,45 +88,25 @@ def fetch_6months(pair):
 def time_to_dt(t):
     return datetime.strptime(t[:19], '%Y-%m-%dT%H:%M:%S').replace(tzinfo=timezone.utc)
 
-# --- BUILD OPENING RANGE for each session-day -----------------------
-def find_sessions(candles, session_hour, session_minute, range_minutes):
-    # Returns list of {range_start_i, range_end_i, high, low}
-    sessions = []
-    n_range_bars = range_minutes // 5   # how many M5 bars make up the range
-    i = 0
-    seen_days = set()
-    while i < len(candles):
-        dt = time_to_dt(candles[i]['time'])
-        day_key = dt.strftime('%Y-%m-%d') + '_' + str(session_hour)
-        if (dt.hour == session_hour and dt.minute == session_minute
-                and day_key not in seen_days
-                and dt.weekday() < 5):
-            seen_days.add(day_key)
-            range_end = i + n_range_bars
-            if range_end < len(candles):
-                window = candles[i:range_end]
-                sessions.append({
-                    'start_i': i,
-                    'end_i':   range_end,
-                    'high':    max(c['high'] for c in window),
-                    'low':     min(c['low']  for c in window),
-                })
-        i += 1
-    return sessions
+# --- FIND EACH DAY'S 00:00 UTC RANGE CANDLE (from H1 data) -----------
+def find_range_candles(h1):
+    ranges = []
+    for c in h1:
+        dt = time_to_dt(c['time'])
+        if dt.hour == RANGE_CANDLE_UTC_HOUR and dt.weekday() < 5:
+            rng = c['high'] - c['low']
+            if rng <= 0:
+                continue
+            ranges.append({
+                'date':  dt.strftime('%Y-%m-%d'),
+                'dt':    dt,
+                'high':  c['high'],
+                'low':   c['low'],
+                'range': rng,
+            })
+    return ranges
 
-# --- WICK REJECTION FILTER -------------------------------------------
-def passes_wick_filter(candle, direction):
-    rng = candle['high'] - candle['low']
-    if rng <= 0:
-        return True
-    if direction == 'BUY':
-        close_pos = (candle['close'] - candle['low']) / rng
-        return close_pos >= (1 - WICK_MIN_BODY_POS)
-    else:
-        close_pos = (candle['close'] - candle['low']) / rng
-        return close_pos <= WICK_MIN_BODY_POS
-
-# --- SIMULATE TRADE (wick-based, no expiry within remaining session) -
+# --- SIMULATE (wick-based, no expiry) ---------------------------------
 def simulate(direction, entry, sl, tp, future):
     for c in future:
         if direction == 'BUY':
@@ -155,76 +119,89 @@ def simulate(direction, entry, sl, tp, future):
                 return 'SL', sl
             if c['low'] <= tp:
                 return 'TP', tp
-    return 'OPEN', future[-1]['close'] if future else entry
+    return 'OPEN', None
 
-# --- BACKTEST ONE PAIR / SESSION / RANGE MODE ------------------------
-def backtest_combo(pair, candles, session_name, session_hour, session_minute, range_minutes):
-    sessions = find_sessions(candles, session_hour, session_minute, range_minutes)
+# --- BACKTEST -----------------------------------------------------------
+def backtest(h1, m15):
+    ranges  = find_range_candles(h1)
+    m15_times = [time_to_dt(c['time']) for c in m15]
+
+    def m15_index_at_or_after(target_dt):
+        lo, hi = 0, len(m15_times) - 1
+        if lo > hi:
+            return None
+        while lo < hi:
+            mid = (lo + hi) // 2
+            if m15_times[mid] < target_dt:
+                lo = mid + 1
+            else:
+                hi = mid
+        return lo if m15_times[lo] >= target_dt else None
+
     trades = []
+    for rng in ranges:
+        high, low, r = rng['high'], rng['low'], rng['range']
+        buy_entry,  buy_sl  = low + 0.75 * r, low + 0.25 * r
+        sell_entry, sell_sl = low + 0.25 * r, low + 0.75 * r
 
-    for sess in sessions:
-        end_i = sess['end_i']
-        high, low = sess['high'], sess['low']
-        range_height = high - low
-        if range_height <= 0:
+        # search window: from 1h after range candle to end of that trading day (~20h)
+        search_start = rng['dt'] + timedelta(hours=1)
+        start_idx = m15_index_at_or_after(search_start)
+        if start_idx is None:
             continue
+        end_idx = min(start_idx + 80, len(m15))   # ~20h of M15 bars
 
-        traded_this_session = False
-        # Search forward up to end of trading day (next ~16h = 192 M5 bars) for first breakout
-        for j in range(end_i, min(end_i + 192, len(candles))):
-            if traded_this_session:
+        traded = False
+        for j in range(start_idx, end_idx):
+            if traded:
                 break
-            c = candles[j]
-
-            direction = None
+            c = m15[j]
             if c['close'] > high:
-                direction = 'BUY'
+                # look forward for retrace to buy_entry
+                for k in range(j + 1, min(j + 200, len(m15))):
+                    ck = m15[k]
+                    if ck['low'] <= buy_entry:
+                        risk = buy_entry - buy_sl
+                        if risk <= 0:
+                            break
+                        tp = buy_entry + risk * 2
+                        future = m15[k+1:k+1+2000]
+                        result, exit_px = simulate('BUY', buy_entry, buy_sl, tp, future)
+                        if result == 'OPEN':
+                            break
+                        rr = 2.0 if result == 'TP' else -1.0
+                        trades.append({
+                            'date': rng['date'], 'direction': 'BUY',
+                            'entry': round(buy_entry, 2), 'sl': round(buy_sl, 2),
+                            'tp': round(tp, 2), 'result': result, 'rr': rr,
+                        })
+                        traded = True
+                        break
+                break
             elif c['close'] < low:
-                direction = 'SELL'
-            if not direction:
-                continue
-            if WICK_FILTER and not passes_wick_filter(c, direction):
-                continue
-
-            entry = c['close']
-            if direction == 'BUY':
-                sl  = low
-                tp1 = entry + range_height
-                tp2 = entry + range_height * 2
-            else:
-                sl  = high
-                tp1 = entry - range_height
-                tp2 = entry - range_height * 2
-
-            risk = abs(entry - sl)
-            if risk <= 0:
-                continue
-
-            future = candles[j+1:j+1+5000]
-            result, exit_px = simulate(direction, entry, sl, tp1, future)
-            if result == 'OPEN':
-                break  # ran out of data, skip (rare, end of dataset)
-
-            if direction == 'BUY':
-                pips = (to_pips(tp1 - entry, pair) if result == 'TP'
-                        else -to_pips(entry - sl, pair))
-            else:
-                pips = (to_pips(entry - tp1, pair) if result == 'TP'
-                        else -to_pips(sl - entry, pair))
-
-            trades.append({
-                'pair': pair, 'session': session_name, 'mode': str(range_minutes) + 'm',
-                'time': c['time'][:16].replace('T', ' '),
-                'direction': direction,
-                'entry': round(entry, 5), 'sl': round(sl, 5), 'tp1': round(tp1, 5),
-                'range_pips': to_pips(range_height, pair),
-                'result': result, 'pips': round(pips, 1),
-            })
-            traded_this_session = True
-
+                for k in range(j + 1, min(j + 200, len(m15))):
+                    ck = m15[k]
+                    if ck['high'] >= sell_entry:
+                        risk = sell_sl - sell_entry
+                        if risk <= 0:
+                            break
+                        tp = sell_entry - risk * 2
+                        future = m15[k+1:k+1+2000]
+                        result, exit_px = simulate('SELL', sell_entry, sell_sl, tp, future)
+                        if result == 'OPEN':
+                            break
+                        rr = 2.0 if result == 'TP' else -1.0
+                        trades.append({
+                            'date': rng['date'], 'direction': 'SELL',
+                            'entry': round(sell_entry, 2), 'sl': round(sell_sl, 2),
+                            'tp': round(tp, 2), 'result': result, 'rr': rr,
+                        })
+                        traded = True
+                        break
+                break
     return trades
 
-# --- TELEGRAM ----------------------------------------------------------
+# --- TELEGRAM ------------------------------------------------------------
 def send_telegram(msg):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
         return
@@ -235,97 +212,81 @@ def send_telegram(msg):
     except Exception as e:
         print('  Telegram error: ' + str(e))
 
-# --- MAIN ---------------------------------------------------------------
+# --- MAIN ------------------------------------------------------------------
 def main():
     NL  = chr(10)
     SEP = '=' * 70
     print(SEP)
-    print('  ORB SNIPER-STYLE BREAKOUT BACKTEST (independent reimplementation)')
-    print('  Modes: 5m / 15m ORB | Sessions: London 07:00 UTC, NY 13:30 UTC')
-    print('  Wick filter: ' + str(WICK_FILTER) + ' | TP1 = 1x range | TP2 = 2x range')
+    print('  5:30 AM IST RANGE BREAKOUT+RETRACE BACKTEST - XAU/USD')
+    print('  Range candle: 00:00 UTC H1 | Entry: 75%/25% retrace | RR 1:2')
     print(SEP)
 
-    all_trades = []
-    summary    = {}  # key: (session, mode) -> list of trades
+    print(NL + 'Fetching XAU_USD H1 (6 months)...')
+    h1 = fetch_period(PAIR, 'H1', days=183)
+    print('  H1 candles: ' + str(len(h1)))
 
-    for pair in PAIRS:
-        print(NL + 'Fetching ' + pair + ' M5 (6 months)...')
-        candles = fetch_6months(pair)
-        print('  Candles: ' + str(len(candles)))
-        if len(candles) < 500:
-            print('  Not enough data, skipping')
-            continue
+    print('Fetching XAU_USD M15 (6 months)...')
+    m15 = fetch_period(PAIR, 'M15', days=183)
+    print('  M15 candles: ' + str(len(m15)))
 
-        for session_name, s_hour in SESSIONS.items():
-            s_min = SESSION_MINUTE[session_name]
-            for r_min in RANGE_MODES:
-                trades = backtest_combo(pair, candles, session_name, s_hour, s_min, r_min)
-                all_trades.extend(trades)
-                key = (session_name, str(r_min) + 'm')
-                summary.setdefault(key, []).extend(trades)
+    if len(h1) < 100 or len(m15) < 500:
+        print('Not enough data.')
+        return
 
-    # --- Overall ---
-    total = len(all_trades)
-    tps   = [t for t in all_trades if t['result'] == 'TP']
-    sls   = [t for t in all_trades if t['result'] == 'SL']
-    wr    = round(len(tps) / total * 100, 1) if total else 0
-    pl    = round(sum(t['pips'] for t in all_trades), 1)
-    gw    = sum(t['pips'] for t in tps)
-    gl    = abs(sum(t['pips'] for t in sls)) or 1
-    pf    = round(gw / gl, 2)
+    trades = backtest(h1, m15)
+    total  = len(trades)
+    wins   = [t for t in trades if t['result'] == 'TP']
+    losses = [t for t in trades if t['result'] == 'SL']
+    wr     = round(len(wins) / total * 100, 1) if total else 0
+    net_r  = round(sum(t['rr'] for t in trades), 2)
 
     print(NL + SEP)
-    print('  OVERALL (all sessions, all modes, all pairs)')
+    print('  OVERALL (6 months)')
     print(SEP)
     print('  Total trades: ' + str(total))
-    print('  Win Rate:     ' + str(wr) + '%')
-    print('  Total P&L:    ' + str(pl) + ' pips')
-    print('  Profit Factor:' + str(pf))
+    print('  Wins: ' + str(len(wins)) + '  Losses: ' + str(len(losses)))
+    print('  Win Rate: ' + str(wr) + '%')
+    print('  Net R: ' + str(net_r) + 'R')
 
-    print(NL + '  BY SESSION + MODE:')
-    for (session_name, mode), trades in summary.items():
-        if not trades:
-            continue
-        w  = [t for t in trades if t['result'] == 'TP']
-        wp = round(len(w) / len(trades) * 100, 1)
-        pp = round(sum(t['pips'] for t in trades), 1)
-        print('  ' + session_name.ljust(8) + mode.ljust(5) +
-              ' T:' + str(len(trades)).rjust(4) +
-              ' WR:' + str(wp).rjust(6) + '%' +
-              ' P&L:' + str(pp).rjust(9) + 'p')
+    # --- Monthly breakdown ---
+    monthly = {}
+    for t in trades:
+        mkey = t['date'][:7]   # YYYY-MM
+        monthly.setdefault(mkey, []).append(t)
 
-    print(NL + '  BY PAIR:')
-    for pair in PAIRS:
-        t = [x for x in all_trades if x['pair'] == pair]
-        if not t:
-            print('  ' + pair.replace('_', '/').ljust(9) + ' no trades')
-            continue
-        w  = [x for x in t if x['result'] == 'TP']
-        wp = round(len(w) / len(t) * 100, 1)
-        pp = round(sum(x['pips'] for x in t), 1)
-        print('  ' + pair.replace('_', '/').ljust(9) +
-              ' T:' + str(len(t)).rjust(4) +
-              ' W:' + str(len(w)).rjust(4) +
-              ' WR:' + str(wp).rjust(6) + '%' +
-              ' P&L:' + str(pp).rjust(9) + 'p')
+    print(NL + '  MONTHLY BREAKDOWN:')
+    print('  ' + 'Month'.ljust(9) + 'Trades'.ljust(8) + 'Wins'.ljust(6) +
+          'Losses'.ljust(8) + 'WR%'.ljust(8) + 'Net R')
+    print('  ' + '-' * 55)
+    for mkey in sorted(monthly.keys()):
+        mt = monthly[mkey]
+        mw = [t for t in mt if t['result'] == 'TP']
+        ml = [t for t in mt if t['result'] == 'SL']
+        mwr = round(len(mw) / len(mt) * 100, 1) if mt else 0
+        mr  = round(sum(t['rr'] for t in mt), 2)
+        print('  ' + mkey.ljust(9) + str(len(mt)).ljust(8) + str(len(mw)).ljust(6) +
+              str(len(ml)).ljust(8) + (str(mwr) + '%').ljust(8) + str(mr) + 'R')
+
+    print(NL + '  TRADE LOG:')
+    for t in trades:
+        print('  ' + t['date'] + ' ' + t['direction'].ljust(4) +
+              ' E:' + str(t['entry']) + ' SL:' + str(t['sl']) + ' TP:' + str(t['tp']) +
+              ' ' + t['result'].ljust(4) + ' ' + str(t['rr']) + 'R')
 
     # --- Telegram ---
-    tg  = '<b>ORB Sniper-Style Backtest (6mo)</b>' + NL
-    tg += '5m/15m ORB | London+NY open | Wick filter ON' + NL + NL
+    tg  = '<b>5:30 AM IST Range Breakout - XAU/USD Backtest</b>' + NL
+    tg += '6 months | RR 1:2 | 75%/25% retrace entries' + NL + NL
     tg += '<b>OVERALL:</b>' + NL
     tg += 'Trades: ' + str(total) + NL
     tg += 'Win Rate: <b>' + str(wr) + '%</b>' + NL
-    tg += 'Total P&L: ' + str(pl) + ' pips' + NL
-    tg += 'Profit Factor: ' + str(pf) + NL + NL
-    tg += '<b>BY SESSION+MODE:</b>' + NL
-    for (session_name, mode), trades in summary.items():
-        if not trades:
-            continue
-        w  = [t for t in trades if t['result'] == 'TP']
-        wp = round(len(w) / len(trades) * 100, 1)
-        pp = round(sum(t['pips'] for t in trades), 1)
-        tg += (session_name + ' ' + mode + ': T:' + str(len(trades)) +
-               ' WR:' + str(wp) + '% P&L:' + str(pp) + 'p' + NL)
+    tg += 'Net R: <b>' + str(net_r) + 'R</b>' + NL + NL
+    tg += '<b>MONTHLY:</b>' + NL
+    for mkey in sorted(monthly.keys()):
+        mt = monthly[mkey]
+        mw = [t for t in mt if t['result'] == 'TP']
+        mwr = round(len(mw) / len(mt) * 100, 1) if mt else 0
+        mr  = round(sum(t['rr'] for t in mt), 2)
+        tg += (mkey + ': T:' + str(len(mt)) + ' WR:' + str(mwr) + '% Net:' + str(mr) + 'R' + NL)
     send_telegram(tg)
     print(NL + 'Done.')
 
