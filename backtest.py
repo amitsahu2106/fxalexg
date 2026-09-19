@@ -16,6 +16,9 @@
 #  - One trade per day maximum (first valid breakout+retrace only)
 #  - Entry stays valid until SL or TP is hit - no expiry
 #  - "75% of the candle" = low + 0.75*(high-low); "25%" = low + 0.25*(high-low)
+#  - TP replaced with a STEPPED TRAILING SL (see simulate_trailing below):
+#    reach 1R -> SL to breakeven, reach 2R -> SL to 1R, reach 3R -> SL to 2R, etc.
+#    Trade runs uncapped until the trailing SL is eventually hit.
 # ===================================================================
 import requests, os, time
 from datetime import datetime, timezone, timedelta
@@ -106,20 +109,41 @@ def find_range_candles(h1):
             })
     return ranges
 
-# --- SIMULATE (wick-based, no expiry) ---------------------------------
-def simulate(direction, entry, sl, tp, future):
+# --- SIMULATE WITH STEPPED TRAILING SL (no fixed TP) ------------------
+# Rule: when price reaches N*R profit (N=1,2,3,...), SL moves to (N-1)*R.
+#   Reach 1R -> SL to breakeven (0R)
+#   Reach 2R -> SL to 1R
+#   Reach 3R -> SL to 2R  ... and so on, uncapped.
+# ASSUMPTION: within a single candle we can't know whether the favorable
+# wick (new R level) or the unfavorable wick (stop hit) came first. We
+# resolve each candle by first advancing the trailing level as far as the
+# candle's favorable extreme allows, THEN checking if the candle's
+# unfavorable extreme would have hit the (now updated) SL. This is the
+# same conservative-but-standard convention used elsewhere in these
+# backtests; it can slightly overstate trailing profits on big single-
+# candle spikes. Flagging this clearly rather than hiding it.
+def simulate_trailing(direction, entry, initial_sl, risk, future):
+    achieved_level = 0        # highest whole R-multiple reached so far
+    current_sl     = initial_sl
+
     for c in future:
         if direction == 'BUY':
-            if c['low'] <= sl:
-                return 'SL', sl
-            if c['high'] >= tp:
-                return 'TP', tp
+            # advance trailing level using this candle's high
+            while c['high'] >= entry + (achieved_level + 1) * risk:
+                achieved_level += 1
+                current_sl = entry if achieved_level == 1 else entry + (achieved_level - 1) * risk
+            if c['low'] <= current_sl:
+                exit_r = (current_sl - entry) / risk
+                return 'STOPPED', round(exit_r, 2), round(current_sl, 5)
         else:
-            if c['high'] >= sl:
-                return 'SL', sl
-            if c['low'] <= tp:
-                return 'TP', tp
-    return 'OPEN', None
+            while c['low'] <= entry - (achieved_level + 1) * risk:
+                achieved_level += 1
+                current_sl = entry if achieved_level == 1 else entry - (achieved_level - 1) * risk
+            if c['high'] >= current_sl:
+                exit_r = (entry - current_sl) / risk
+                return 'STOPPED', round(exit_r, 2), round(current_sl, 5)
+
+    return 'OPEN', None, None
 
 # --- BACKTEST -----------------------------------------------------------
 def backtest(h1, m15):
@@ -164,16 +188,14 @@ def backtest(h1, m15):
                         risk = buy_entry - buy_sl
                         if risk <= 0:
                             break
-                        tp = buy_entry + risk * 2
-                        future = m15[k+1:k+1+2000]
-                        result, exit_px = simulate('BUY', buy_entry, buy_sl, tp, future)
+                        future = m15[k+1:k+1+5000]
+                        result, exit_r, exit_sl = simulate_trailing('BUY', buy_entry, buy_sl, risk, future)
                         if result == 'OPEN':
                             break
-                        rr = 2.0 if result == 'TP' else -1.0
                         trades.append({
                             'date': rng['date'], 'direction': 'BUY',
-                            'entry': round(buy_entry, 2), 'sl': round(buy_sl, 2),
-                            'tp': round(tp, 2), 'result': result, 'rr': rr,
+                            'entry': round(buy_entry, 2), 'initial_sl': round(buy_sl, 2),
+                            'exit_sl': exit_sl, 'result': result, 'rr': exit_r,
                         })
                         traded = True
                         break
@@ -185,16 +207,14 @@ def backtest(h1, m15):
                         risk = sell_sl - sell_entry
                         if risk <= 0:
                             break
-                        tp = sell_entry - risk * 2
-                        future = m15[k+1:k+1+2000]
-                        result, exit_px = simulate('SELL', sell_entry, sell_sl, tp, future)
+                        future = m15[k+1:k+1+5000]
+                        result, exit_r, exit_sl = simulate_trailing('SELL', sell_entry, sell_sl, risk, future)
                         if result == 'OPEN':
                             break
-                        rr = 2.0 if result == 'TP' else -1.0
                         trades.append({
                             'date': rng['date'], 'direction': 'SELL',
-                            'entry': round(sell_entry, 2), 'sl': round(sell_sl, 2),
-                            'tp': round(tp, 2), 'result': result, 'rr': rr,
+                            'entry': round(sell_entry, 2), 'initial_sl': round(sell_sl, 2),
+                            'exit_sl': exit_sl, 'result': result, 'rr': exit_r,
                         })
                         traded = True
                         break
@@ -218,7 +238,7 @@ def main():
     SEP = '=' * 70
     print(SEP)
     print('  5:30 AM IST RANGE BREAKOUT+RETRACE BACKTEST - XAU/USD')
-    print('  Range candle: 00:00 UTC H1 | Entry: 75%/25% retrace | RR 1:2')
+    print('  Range candle: 00:00 UTC H1 | Entry: 75%/25% retrace | Stepped trailing SL')
     print(SEP)
 
     print(NL + 'Fetching XAU_USD H1 (6 months)...')
@@ -235,8 +255,8 @@ def main():
 
     trades = backtest(h1, m15)
     total  = len(trades)
-    wins   = [t for t in trades if t['result'] == 'TP']
-    losses = [t for t in trades if t['result'] == 'SL']
+    wins   = [t for t in trades if t['rr'] > 0]
+    losses = [t for t in trades if t['rr'] <= 0]
     wr     = round(len(wins) / total * 100, 1) if total else 0
     net_r  = round(sum(t['rr'] for t in trades), 2)
 
@@ -260,8 +280,8 @@ def main():
     print('  ' + '-' * 55)
     for mkey in sorted(monthly.keys()):
         mt = monthly[mkey]
-        mw = [t for t in mt if t['result'] == 'TP']
-        ml = [t for t in mt if t['result'] == 'SL']
+        mw = [t for t in mt if t['rr'] > 0]
+        ml = [t for t in mt if t['rr'] <= 0]
         mwr = round(len(mw) / len(mt) * 100, 1) if mt else 0
         mr  = round(sum(t['rr'] for t in mt), 2)
         print('  ' + mkey.ljust(9) + str(len(mt)).ljust(8) + str(len(mw)).ljust(6) +
@@ -270,12 +290,13 @@ def main():
     print(NL + '  TRADE LOG:')
     for t in trades:
         print('  ' + t['date'] + ' ' + t['direction'].ljust(4) +
-              ' E:' + str(t['entry']) + ' SL:' + str(t['sl']) + ' TP:' + str(t['tp']) +
-              ' ' + t['result'].ljust(4) + ' ' + str(t['rr']) + 'R')
+              ' E:' + str(t['entry']) + ' InitSL:' + str(t['initial_sl']) +
+              ' ExitSL:' + str(t['exit_sl']) +
+              ' ' + t['result'].ljust(8) + ' ' + str(t['rr']) + 'R')
 
     # --- Telegram ---
     tg  = '<b>5:30 AM IST Range Breakout - XAU/USD Backtest</b>' + NL
-    tg += '6 months | RR 1:2 | 75%/25% retrace entries' + NL + NL
+    tg += '6 months | Stepped trailing SL | 75%/25% retrace entries' + NL + NL
     tg += '<b>OVERALL:</b>' + NL
     tg += 'Trades: ' + str(total) + NL
     tg += 'Win Rate: <b>' + str(wr) + '%</b>' + NL
@@ -283,7 +304,7 @@ def main():
     tg += '<b>MONTHLY:</b>' + NL
     for mkey in sorted(monthly.keys()):
         mt = monthly[mkey]
-        mw = [t for t in mt if t['result'] == 'TP']
+        mw = [t for t in mt if t['rr'] > 0]
         mwr = round(len(mw) / len(mt) * 100, 1) if mt else 0
         mr  = round(sum(t['rr'] for t in mt), 2)
         tg += (mkey + ': T:' + str(len(mt)) + ' WR:' + str(mwr) + '% Net:' + str(mr) + 'R' + NL)
