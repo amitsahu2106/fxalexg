@@ -248,5 +248,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-09-30 07:02 UTC",
     "opened_ts": 1790751776.240068
+  },
+  "AP15R_NZD_USD_2026-09-30_16:03": {
+    "pair": "NZD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_NZD_USD_2026-09-30_16:03",
+    "direction": "SELL",
+    "entry": 0.56389,
+    "sl": 0.56697,
+    "tp1": 0.55927,
+    "tp2": 0.55618,
+    "tp3": 0.5531,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-09-30 16:03 UTC",
+    "opened_ts": 1790784185.630861
   }
 }
