@@ -233,5 +233,39 @@
     "opened_at": "2026-10-05 03:02 UTC",
     "opened_ts": 1791169369.776244
   },
-  "_news_sent_with_events_2026-10-05": "07:02 UTC"
+  "_news_sent_with_events_2026-10-05": "07:02 UTC",
+  "AUD_USD_2026-10-05_17:02": {
+    "pair": "AUD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "AUD_USD_2026-10-05_17:02",
+    "direction": "BUY",
+    "entry": 0.69644,
+    "sl": 0.69415,
+    "tp1": 0.69873,
+    "tp2": 0.7059,
+    "tp3": 0.70866,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.70136,
+    "aoi_bottom": 0.69546,
+    "opened_at": "2026-10-05 17:02 UTC",
+    "opened_ts": 1791219771.99742
+  },
+  "AP15R_USD_CHF_2026-10-05_17:03": {
+    "pair": "USD_CHF",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CHF_2026-10-05_17:03",
+    "direction": "BUY",
+    "entry": 0.83192,
+    "sl": 0.82728,
+    "tp1": 0.83889,
+    "tp2": 0.84353,
+    "tp3": 0.84818,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-10-05 17:03 UTC",
+    "opened_ts": 1791219810.669937
+  }
 }
