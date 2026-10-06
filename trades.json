@@ -267,5 +267,39 @@
     "aoi_bottom": null,
     "opened_at": "2026-10-05 17:03 UTC",
     "opened_ts": 1791219810.669937
+  },
+  "AP15R_GBP_USD_2026-10-06_03:02": {
+    "pair": "GBP_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_GBP_USD_2026-10-06_03:02",
+    "direction": "SELL",
+    "entry": 1.32146,
+    "sl": 1.32576,
+    "tp1": 1.31501,
+    "tp2": 1.31071,
+    "tp3": 1.30641,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-10-06 03:02 UTC",
+    "opened_ts": 1791255777.176429
+  },
+  "AP15R_NZD_USD_2026-10-06_03:03": {
+    "pair": "NZD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_NZD_USD_2026-10-06_03:03",
+    "direction": "SELL",
+    "entry": 0.55953,
+    "sl": 0.5625,
+    "tp1": 0.55507,
+    "tp2": 0.55209,
+    "tp3": 0.54912,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-10-06 03:03 UTC",
+    "opened_ts": 1791255783.56725
   }
 }
