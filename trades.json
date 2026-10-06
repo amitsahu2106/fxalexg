@@ -193,7 +193,7 @@
     "tp1": 0.69873,
     "tp2": 0.7059,
     "tp3": 0.70866,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": 0.70136,
     "aoi_bottom": 0.69546,
@@ -217,21 +217,21 @@
     "opened_at": "2026-10-05 17:03 UTC",
     "opened_ts": 1791219810.669937
   },
-  "AP15R_NZD_USD_2026-10-06_03:03": {
-    "pair": "NZD_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_NZD_USD_2026-10-06_03:03",
-    "direction": "SELL",
-    "entry": 0.55953,
-    "sl": 0.5625,
-    "tp1": 0.55507,
-    "tp2": 0.55209,
-    "tp3": 0.54912,
+  "AUD_USD_2026-10-06_14:02": {
+    "pair": "AUD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "AUD_USD_2026-10-06_14:02",
+    "direction": "BUY",
+    "entry": 0.69784,
+    "sl": 0.69423,
+    "tp1": 0.70145,
+    "tp2": 0.7059,
+    "tp3": 0.70866,
     "tp1_hit": false,
     "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-10-06 03:03 UTC",
-    "opened_ts": 1791255783.56725
+    "aoi_top": 0.70136,
+    "aoi_bottom": 0.69546,
+    "opened_at": "2026-10-06 14:02 UTC",
+    "opened_ts": 1791295360.782151
   }
 }
