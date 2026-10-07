@@ -284,5 +284,39 @@
     "aoi_bottom": null,
     "opened_at": "2026-10-07 03:02 UTC",
     "opened_ts": 1791342179.550117
+  },
+  "AP15R_GBP_USD_2026-10-07_05:02": {
+    "pair": "GBP_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_GBP_USD_2026-10-07_05:02",
+    "direction": "SELL",
+    "entry": 1.32491,
+    "sl": 1.32889,
+    "tp1": 1.31893,
+    "tp2": 1.31495,
+    "tp3": 1.31096,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-10-07 05:02 UTC",
+    "opened_ts": 1791349373.83963
+  },
+  "AP15R_USD_CAD_2026-10-07_05:03": {
+    "pair": "USD_CAD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CAD_2026-10-07_05:03",
+    "direction": "BUY",
+    "entry": 1.42257,
+    "sl": 1.41915,
+    "tp1": 1.4277,
+    "tp2": 1.43112,
+    "tp3": 1.43454,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-10-07 05:03 UTC",
+    "opened_ts": 1791349382.291783
   }
 }
