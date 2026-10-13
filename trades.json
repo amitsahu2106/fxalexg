@@ -458,23 +458,6 @@
     "opened_at": "2026-10-12 09:02 UTC",
     "opened_ts": 1791795779.196213
   },
-  "GBP_USD_2026-10-12_21:02": {
-    "pair": "GBP_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "GBP_USD_2026-10-12_21:02",
-    "direction": "SELL",
-    "entry": 1.32082,
-    "sl": 1.3229,
-    "tp1": 1.31874,
-    "tp2": 1.31666,
-    "tp3": 1.31458,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 1.32156,
-    "aoi_bottom": 1.31634,
-    "opened_at": "2026-10-12 21:02 UTC",
-    "opened_ts": 1791838967.444571
-  },
   "AP15R_NZD_USD_2026-10-13_05:03": {
     "pair": "NZD_USD",
     "strategy": "ALL_PAIRS_15R",
