@@ -271,23 +271,6 @@
   },
   "_news_sent_with_events_2026-10-08": "07:02 UTC",
   "_news_sent_with_events_2026-10-09": "07:02 UTC",
-  "AP15R_USD_CAD_2026-10-09_09:03": {
-    "pair": "USD_CAD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_USD_CAD_2026-10-09_09:03",
-    "direction": "BUY",
-    "entry": 1.42276,
-    "sl": 1.41913,
-    "tp1": 1.42821,
-    "tp2": 1.43185,
-    "tp3": 1.43548,
-    "tp1_hit": true,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-10-09 09:03 UTC",
-    "opened_ts": 1791536586.330202
-  },
   "AUD_USD_2026-10-09_13:02": {
     "pair": "AUD_USD",
     "strategy": "FXALEXG",
@@ -457,5 +440,39 @@
     "aoi_bottom": null,
     "opened_at": "2026-10-12 09:02 UTC",
     "opened_ts": 1791795779.196213
+  },
+  "AP15R_USD_JPY_2026-10-13_14:03": {
+    "pair": "USD_JPY",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_JPY_2026-10-13_14:03",
+    "direction": "BUY",
+    "entry": 158.393,
+    "sl": 157.802,
+    "tp1": 159.2795,
+    "tp2": 159.8705,
+    "tp3": 160.4615,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-10-13 14:03 UTC",
+    "opened_ts": 1791900189.095738
+  },
+  "AP15R_USD_CHF_2026-10-13_14:03": {
+    "pair": "USD_CHF",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_CHF_2026-10-13_14:03",
+    "direction": "BUY",
+    "entry": 0.83309,
+    "sl": 0.83102,
+    "tp1": 0.8362,
+    "tp2": 0.83827,
+    "tp3": 0.84034,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-10-13 14:03 UTC",
+    "opened_ts": 1791900193.152007
   }
 }
