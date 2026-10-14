@@ -356,23 +356,6 @@
     "opened_at": "2026-10-12 09:02 UTC",
     "opened_ts": 1791795774.468991
   },
-  "AP15R_AUD_USD_2026-10-12_09:02": {
-    "pair": "AUD_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_AUD_USD_2026-10-12_09:02",
-    "direction": "SELL",
-    "entry": 0.69704,
-    "sl": 0.69984,
-    "tp1": 0.69284,
-    "tp2": 0.69004,
-    "tp3": 0.68724,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-10-12 09:02 UTC",
-    "opened_ts": 1791795777.460799
-  },
   "AP15R_USD_CHF_2026-10-12_09:02": {
     "pair": "USD_CHF",
     "strategy": "ALL_PAIRS_15R",
