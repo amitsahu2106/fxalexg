@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1791896657.6181738,
+  "_ict_last_alert": 1791968571.2992933,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -92,23 +92,6 @@
     "opened_ts": 1790182985.654305
   },
   "_news_sent_with_events_2026-09-24": "07:02 UTC",
-  "AP15R_AUD_USD_2026-09-24_21:03": {
-    "pair": "AUD_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_AUD_USD_2026-09-24_21:03",
-    "direction": "SELL",
-    "entry": 0.7012,
-    "sl": 0.70481,
-    "tp1": 0.69579,
-    "tp2": 0.69218,
-    "tp3": 0.68857,
-    "tp1_hit": true,
-    "tp2_hit": true,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-09-24 21:03 UTC",
-    "opened_ts": 1790283785.121372
-  },
   "_news_sent_with_events_2026-09-25": "07:02 UTC",
   "_news_sent_with_events_2026-09-28": "07:02 UTC",
   "_news_sent_with_events_2026-09-29": "07:02 UTC",
