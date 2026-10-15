@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1792058585.6656053,
+  "_ict_last_alert": 1792069368.2537584,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -214,12 +214,29 @@
     "tp1": 0.69082,
     "tp2": 0.68649,
     "tp3": 0.68216,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": null,
     "aoi_bottom": null,
     "opened_at": "2026-10-14 13:03 UTC",
     "opened_ts": 1791982989.731287
   },
-  "_news_sent_with_events_2026-10-15": "07:02 UTC"
+  "_news_sent_with_events_2026-10-15": "07:02 UTC",
+  "AP15R_AUD_USD_2026-10-15_13:02": {
+    "pair": "AUD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_AUD_USD_2026-10-15_13:02",
+    "direction": "SELL",
+    "entry": 0.6906,
+    "sl": 0.69834,
+    "tp1": 0.67899,
+    "tp2": 0.67125,
+    "tp3": 0.66351,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-10-15 13:02 UTC",
+    "opened_ts": 1792069373.046052
+  }
 }
