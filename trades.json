@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1792145030.6407175,
+  "_ict_last_alert": 1792159402.7834995,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -57,23 +57,6 @@
   "_news_sent_with_events_2026-09-17": "07:02 UTC",
   "_news_sent_with_events_2026-09-21": "07:02 UTC",
   "_news_sent_with_events_2026-09-23": "07:02 UTC",
-  "AP15R_GBP_USD_2026-09-23_17:02": {
-    "pair": "GBP_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_GBP_USD_2026-09-23_17:02",
-    "direction": "SELL",
-    "entry": 1.32334,
-    "sl": 1.33512,
-    "tp1": 1.30567,
-    "tp2": 1.29389,
-    "tp3": 1.28211,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-09-23 17:02 UTC",
-    "opened_ts": 1790182977.349849
-  },
   "AP15R_NZD_USD_2026-09-23_17:03": {
     "pair": "NZD_USD",
     "strategy": "ALL_PAIRS_15R",
