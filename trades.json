@@ -103,23 +103,6 @@
   "_news_sent_with_events_2026-10-09": "07:02 UTC",
   "_news_sent_with_events_2026-10-14": "07:02 UTC",
   "_news_sent_with_events_2026-10-15": "07:02 UTC",
-  "AP15R_AUD_USD_2026-10-15_13:02": {
-    "pair": "AUD_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_AUD_USD_2026-10-15_13:02",
-    "direction": "SELL",
-    "entry": 0.6906,
-    "sl": 0.69834,
-    "tp1": 0.67899,
-    "tp2": 0.67125,
-    "tp3": 0.66351,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-10-15 13:02 UTC",
-    "opened_ts": 1792069373.046052
-  },
   "GBP_USD_2026-10-16_11:02": {
     "pair": "GBP_USD",
     "strategy": "FXALEXG",
@@ -147,12 +130,29 @@
     "tp1": 0.69867,
     "tp2": 0.7059,
     "tp3": 0.70866,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": 0.70136,
     "aoi_bottom": 0.69546,
     "opened_at": "2026-10-18 22:02 UTC",
     "opened_ts": 1792360954.116315
   },
-  "_news_sent_with_events_2026-10-19": "07:02 UTC"
+  "_news_sent_with_events_2026-10-19": "07:02 UTC",
+  "AUD_USD_2026-10-19_11:02": {
+    "pair": "AUD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "AUD_USD_2026-10-19_11:02",
+    "direction": "BUY",
+    "entry": 0.69888,
+    "sl": 0.69398,
+    "tp1": 0.70378,
+    "tp2": 0.71259,
+    "tp3": 0.71446,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.70136,
+    "aoi_bottom": 0.69546,
+    "opened_at": "2026-10-19 11:02 UTC",
+    "opened_ts": 1792407760.791268
+  }
 }
