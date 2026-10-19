@@ -102,23 +102,6 @@
   "_news_sent_with_events_2026-10-08": "07:02 UTC",
   "_news_sent_with_events_2026-10-09": "07:02 UTC",
   "_news_sent_with_events_2026-10-14": "07:02 UTC",
-  "AP15R_AUD_USD_2026-10-14_13:03": {
-    "pair": "AUD_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_AUD_USD_2026-10-14_13:03",
-    "direction": "SELL",
-    "entry": 0.69731,
-    "sl": 0.70164,
-    "tp1": 0.69082,
-    "tp2": 0.68649,
-    "tp3": 0.68216,
-    "tp1_hit": true,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-10-14 13:03 UTC",
-    "opened_ts": 1791982989.731287
-  },
   "_news_sent_with_events_2026-10-15": "07:02 UTC",
   "AP15R_AUD_USD_2026-10-15_13:02": {
     "pair": "AUD_USD",
@@ -153,23 +136,6 @@
     "aoi_bottom": 1.33239,
     "opened_at": "2026-10-16 11:02 UTC",
     "opened_ts": 1792148553.60846
-  },
-  "AP15R_AUD_USD_2026-10-16_18:03": {
-    "pair": "AUD_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_AUD_USD_2026-10-16_18:03",
-    "direction": "SELL",
-    "entry": 0.69394,
-    "sl": 0.69754,
-    "tp1": 0.68854,
-    "tp2": 0.68494,
-    "tp3": 0.68134,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-10-16 18:03 UTC",
-    "opened_ts": 1792173788.239659
   },
   "AUD_USD_2026-10-18_22:02": {
     "pair": "AUD_USD",
