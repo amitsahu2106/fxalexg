@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1792587799.7985506,
+  "_ict_last_alert": 1792656191.0944018,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -150,7 +150,7 @@
     "tp2": 1.34098,
     "tp3": 1.343,
     "tp1_hit": true,
-    "tp2_hit": false,
+    "tp2_hit": true,
     "aoi_top": 1.33736,
     "aoi_bottom": 1.33239,
     "opened_at": "2026-10-20 09:02 UTC",
