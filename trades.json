@@ -190,22 +190,5 @@
     "opened_at": "2026-10-20 20:02 UTC",
     "opened_ts": 1792526577.620648
   },
-  "_news_sent_with_events_2026-10-21": "07:02 UTC",
-  "NZD_USD_2026-10-22_01:02": {
-    "pair": "NZD_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "NZD_USD_2026-10-22_01:02",
-    "direction": "BUY",
-    "entry": 0.5708,
-    "sl": 0.56967,
-    "tp1": 0.57193,
-    "tp2": 0.58648,
-    "tp3": 0.58943,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 0.57474,
-    "aoi_bottom": 0.57101,
-    "opened_at": "2026-10-22 01:02 UTC",
-    "opened_ts": 1792630969.275764
-  }
+  "_news_sent_with_events_2026-10-21": "07:02 UTC"
 }
