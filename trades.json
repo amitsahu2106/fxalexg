@@ -241,5 +241,22 @@
     "aoi_bottom": 0.69546,
     "opened_at": "2026-10-26 14:02 UTC",
     "opened_ts": 1793023372.049602
+  },
+  "AP15R_GBP_USD_2026-10-26_21:02": {
+    "pair": "GBP_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_GBP_USD_2026-10-26_21:02",
+    "direction": "SELL",
+    "entry": 1.3342,
+    "sl": 1.33908,
+    "tp1": 1.32688,
+    "tp2": 1.322,
+    "tp3": 1.31712,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-10-26 21:02 UTC",
+    "opened_ts": 1793048571.892406
   }
 }
