@@ -294,22 +294,5 @@
     "opened_at": "2026-10-28 05:02 UTC",
     "opened_ts": 1793163777.837418
   },
-  "_news_sent_with_events_2026-10-28": "07:02 UTC",
-  "GBP_USD_2026-10-28_07:02": {
-    "pair": "GBP_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "GBP_USD_2026-10-28_07:02",
-    "direction": "SELL",
-    "entry": 1.32797,
-    "sl": 1.32999,
-    "tp1": 1.32595,
-    "tp2": 1.32083,
-    "tp3": 1.31924,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 1.32881,
-    "aoi_bottom": 1.32508,
-    "opened_at": "2026-10-28 07:02 UTC",
-    "opened_ts": 1793170962.994396
-  }
+  "_news_sent_with_events_2026-10-28": "07:02 UTC"
 }
