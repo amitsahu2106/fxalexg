@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1793261018.2085803,
+  "_ict_last_alert": 1793278989.6048937,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -295,5 +295,22 @@
     "opened_at": "2026-10-29 06:02 UTC",
     "opened_ts": 1793253779.030513
   },
-  "_news_sent_with_events_2026-10-29": "07:02 UTC"
+  "_news_sent_with_events_2026-10-29": "07:02 UTC",
+  "AP15R_EUR_USD_2026-10-29_13:03": {
+    "pair": "EUR_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_EUR_USD_2026-10-29_13:03",
+    "direction": "SELL",
+    "entry": 1.1128,
+    "sl": 1.11725,
+    "tp1": 1.10613,
+    "tp2": 1.10167,
+    "tp3": 1.09722,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-10-29 13:03 UTC",
+    "opened_ts": 1793278991.89741
+  }
 }
