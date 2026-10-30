@@ -177,23 +177,6 @@
   },
   "_news_sent_with_events_2026-10-28": "07:02 UTC",
   "_news_sent_with_events_2026-10-29": "07:02 UTC",
-  "XAU_USD_2026-10-30_09:02": {
-    "pair": "XAU_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "XAU_USD_2026-10-30_09:02",
-    "direction": "SELL",
-    "entry": 3997.275,
-    "sl": 4024.48696,
-    "tp1": 3970.06304,
-    "tp2": 3942.85108,
-    "tp3": 3915.63912,
-    "tp1_hit": true,
-    "tp2_hit": false,
-    "aoi_top": 4001.185,
-    "aoi_bottom": 3995.81,
-    "opened_at": "2026-10-30 09:02 UTC",
-    "opened_ts": 1793350969.336568
-  },
   "AP15R_EUR_USD_2026-10-30_13:02": {
     "pair": "EUR_USD",
     "strategy": "ALL_PAIRS_15R",
@@ -210,5 +193,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-10-30 13:02 UTC",
     "opened_ts": 1793365376.834677
+  },
+  "AP15R_NZD_USD_2026-10-30_14:03": {
+    "pair": "NZD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_NZD_USD_2026-10-30_14:03",
+    "direction": "SELL",
+    "entry": 0.56246,
+    "sl": 0.56547,
+    "tp1": 0.55795,
+    "tp2": 0.55494,
+    "tp3": 0.55193,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-10-30 14:03 UTC",
+    "opened_ts": 1793368988.291944
   }
 }
