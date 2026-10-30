@@ -193,5 +193,22 @@
     "opened_at": "2026-10-29 06:02 UTC",
     "opened_ts": 1793253779.030513
   },
-  "_news_sent_with_events_2026-10-29": "07:02 UTC"
+  "_news_sent_with_events_2026-10-29": "07:02 UTC",
+  "XAU_USD_2026-10-30_03:02": {
+    "pair": "XAU_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "XAU_USD_2026-10-30_03:02",
+    "direction": "SELL",
+    "entry": 3997.665,
+    "sl": 4023.01589,
+    "tp1": 3972.31411,
+    "tp2": 3946.96322,
+    "tp3": 3921.61233,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 4001.185,
+    "aoi_bottom": 3995.81,
+    "opened_at": "2026-10-30 03:02 UTC",
+    "opened_ts": 1793329367.769072
+  }
 }
