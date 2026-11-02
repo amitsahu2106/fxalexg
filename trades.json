@@ -229,23 +229,6 @@
     "opened_ts": 1793574177.757203
   },
   "_news_sent_with_events_2026-11-02": "07:02 UTC",
-  "USD_CAD_2026-11-02_13:04": {
-    "pair": "USD_CAD",
-    "strategy": "FXALEXG",
-    "trade_key": "USD_CAD_2026-11-02_13:04",
-    "direction": "SELL",
-    "entry": 1.39777,
-    "sl": 1.39915,
-    "tp1": 1.39639,
-    "tp2": 1.3794,
-    "tp3": 1.37669,
-    "tp1_hit": true,
-    "tp2_hit": false,
-    "aoi_top": 1.39739,
-    "aoi_bottom": 1.39154,
-    "opened_at": "2026-11-02 13:04 UTC",
-    "opened_ts": 1793624644.992107
-  },
   "GBP_USD_2026-11-02_15:03": {
     "pair": "GBP_USD",
     "strategy": "FXALEXG",
