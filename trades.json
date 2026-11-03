@@ -160,23 +160,6 @@
     "opened_at": "2026-10-30 14:03 UTC",
     "opened_ts": 1793368988.291944
   },
-  "USD_JPY_2026-11-01_23:02": {
-    "pair": "USD_JPY",
-    "strategy": "FXALEXG",
-    "trade_key": "USD_JPY_2026-11-01_23:02",
-    "direction": "SELL",
-    "entry": 157.514,
-    "sl": 158.07957,
-    "tp1": 156.94843,
-    "tp2": 156.38286,
-    "tp3": 155.81729,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 157.723,
-    "aoi_bottom": 157.165,
-    "opened_at": "2026-11-01 23:02 UTC",
-    "opened_ts": 1793574158.246335
-  },
   "AP15R_NZD_USD_2026-11-01_23:02": {
     "pair": "NZD_USD",
     "strategy": "ALL_PAIRS_15R",
