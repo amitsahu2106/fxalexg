@@ -170,7 +170,7 @@
     "tp1": 0.55865,
     "tp2": 0.55592,
     "tp3": 0.55319,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": null,
     "aoi_bottom": null,
@@ -229,5 +229,22 @@
     "opened_at": "2026-11-02 23:03 UTC",
     "opened_ts": 1793660627.91197
   },
-  "_news_sent_with_events_2026-11-03": "07:02 UTC"
+  "_news_sent_with_events_2026-11-03": "07:02 UTC",
+  "AP15R_USD_JPY_2026-11-03_22:02": {
+    "pair": "USD_JPY",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_JPY_2026-11-03_22:02",
+    "direction": "BUY",
+    "entry": 158.71,
+    "sl": 157.722,
+    "tp1": 160.192,
+    "tp2": 161.18,
+    "tp3": 162.168,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-11-03 22:02 UTC",
+    "opened_ts": 1793743377.600471
+  }
 }
