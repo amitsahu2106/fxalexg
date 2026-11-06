@@ -67,7 +67,7 @@
     "tp1": 0.5558,
     "tp2": 0.54871,
     "tp3": 0.54162,
-    "tp1_hit": false,
+    "tp1_hit": true,
     "tp2_hit": false,
     "aoi_top": null,
     "aoi_bottom": null,
@@ -178,23 +178,6 @@
     "aoi_bottom": null,
     "opened_at": "2026-11-04 09:03 UTC",
     "opened_ts": 1793782985.529571
-  },
-  "AP15R_AUD_USD_2026-11-04_22:02": {
-    "pair": "AUD_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_AUD_USD_2026-11-04_22:02",
-    "direction": "SELL",
-    "entry": 0.7006,
-    "sl": 0.70393,
-    "tp1": 0.69561,
-    "tp2": 0.69229,
-    "tp3": 0.68896,
-    "tp1_hit": true,
-    "tp2_hit": true,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-11-04 22:02 UTC",
-    "opened_ts": 1793829775.144256
   },
   "AP15R_USD_CHF_2026-11-05_00:03": {
     "pair": "USD_CHF",
@@ -315,5 +298,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-11-06 04:03 UTC",
     "opened_ts": 1793937810.052192
+  },
+  "AP15R_EUR_USD_2026-11-06_06:03": {
+    "pair": "EUR_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_EUR_USD_2026-11-06_06:03",
+    "direction": "SELL",
+    "entry": 1.11963,
+    "sl": 1.12489,
+    "tp1": 1.11175,
+    "tp2": 1.10649,
+    "tp3": 1.10124,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-11-06 06:03 UTC",
+    "opened_ts": 1793945007.662422
   }
 }
