@@ -127,23 +127,6 @@
   "_news_sent_with_events_2026-10-28": "07:02 UTC",
   "_news_sent_with_events_2026-10-29": "07:02 UTC",
   "_news_sent_with_events_2026-11-02": "07:02 UTC",
-  "AP15R_AUD_USD_2026-11-02_22:03": {
-    "pair": "AUD_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_AUD_USD_2026-11-02_22:03",
-    "direction": "SELL",
-    "entry": 0.69982,
-    "sl": 0.7037,
-    "tp1": 0.694,
-    "tp2": 0.69012,
-    "tp3": 0.68624,
-    "tp1_hit": true,
-    "tp2_hit": true,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-11-02 22:03 UTC",
-    "opened_ts": 1793657021.807089
-  },
   "_news_sent_with_events_2026-11-03": "07:02 UTC",
   "AP15R_USD_JPY_2026-11-04_09:03": {
     "pair": "USD_JPY",
