@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1793970184.1259785,
+  "_ict_last_alert": 1793977397.1663413,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -191,7 +191,7 @@
     "tp2": 0.55346,
     "tp3": 0.55048,
     "tp1_hit": true,
-    "tp2_hit": false,
+    "tp2_hit": true,
     "aoi_top": 0.56104,
     "aoi_bottom": 0.55567,
     "opened_at": "2026-11-05 23:02 UTC",
@@ -265,5 +265,22 @@
     "opened_at": "2026-11-06 06:03 UTC",
     "opened_ts": 1793945007.662422
   },
-  "_news_sent_with_events_2026-11-06": "07:02 UTC"
+  "_news_sent_with_events_2026-11-06": "07:02 UTC",
+  "AUD_USD_2026-11-06_15:02": {
+    "pair": "AUD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "AUD_USD_2026-11-06_15:02",
+    "direction": "SELL",
+    "entry": 0.68922,
+    "sl": 0.69539,
+    "tp1": 0.68305,
+    "tp2": 0.66609,
+    "tp3": 0.665,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.69306,
+    "aoi_bottom": 0.68869,
+    "opened_at": "2026-11-06 15:02 UTC",
+    "opened_ts": 1793977376.092852
+  }
 }
