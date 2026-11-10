@@ -181,23 +181,6 @@
     "opened_at": "2026-11-06 15:02 UTC",
     "opened_ts": 1793977376.092852
   },
-  "AP15R_GBP_USD_2026-11-09_22:03": {
-    "pair": "GBP_USD",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_GBP_USD_2026-11-09_22:03",
-    "direction": "BUY",
-    "entry": 1.34424,
-    "sl": 1.3367,
-    "tp1": 1.35555,
-    "tp2": 1.36309,
-    "tp3": 1.37063,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-11-09 22:03 UTC",
-    "opened_ts": 1794261825.95449
-  },
   "_news_sent_with_events_2026-11-10": "07:02 UTC",
   "AP15R_EUR_USD_2026-11-10_14:03": {
     "pair": "EUR_USD",
@@ -232,5 +215,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-11-10 14:03 UTC",
     "opened_ts": 1794319425.558062
+  },
+  "GBP_USD_2026-11-10_18:02": {
+    "pair": "GBP_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "GBP_USD_2026-11-10_18:02",
+    "direction": "SELL",
+    "entry": 1.33334,
+    "sl": 1.34007,
+    "tp1": 1.32661,
+    "tp2": 1.32117,
+    "tp3": 1.31924,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 1.33736,
+    "aoi_bottom": 1.33239,
+    "opened_at": "2026-11-10 18:02 UTC",
+    "opened_ts": 1794333770.717726
   }
 }
