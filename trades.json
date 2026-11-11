@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1794384177.6970956,
+  "_ict_last_alert": 1794391398.7688353,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -250,5 +250,39 @@
     "opened_at": "2026-11-10 23:02 UTC",
     "opened_ts": 1794351762.633075
   },
-  "_news_sent_with_events_2026-11-11": "07:02 UTC"
+  "_news_sent_with_events_2026-11-11": "07:02 UTC",
+  "AP15R_USD_JPY_2026-11-11_10:03": {
+    "pair": "USD_JPY",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_USD_JPY_2026-11-11_10:03",
+    "direction": "BUY",
+    "entry": 158.966,
+    "sl": 158.424,
+    "tp1": 159.779,
+    "tp2": 160.321,
+    "tp3": 160.863,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-11-11 10:03 UTC",
+    "opened_ts": 1794391408.767753
+  },
+  "AP15R_AUD_USD_2026-11-11_10:03": {
+    "pair": "AUD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_AUD_USD_2026-11-11_10:03",
+    "direction": "SELL",
+    "entry": 0.68654,
+    "sl": 0.6897,
+    "tp1": 0.68179,
+    "tp2": 0.67863,
+    "tp3": 0.67547,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-11-11 10:03 UTC",
+    "opened_ts": 1794391410.537623
+  }
 }
