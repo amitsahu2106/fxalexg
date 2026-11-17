@@ -336,23 +336,6 @@
     "opened_at": "2026-11-12 18:03 UTC",
     "opened_ts": 1794506599.685383
   },
-  "AP15R_USD_JPY_2026-11-12_18:03": {
-    "pair": "USD_JPY",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_USD_JPY_2026-11-12_18:03",
-    "direction": "BUY",
-    "entry": 159.772,
-    "sl": 159.262,
-    "tp1": 160.537,
-    "tp2": 161.047,
-    "tp3": 161.557,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-11-12 18:03 UTC",
-    "opened_ts": 1794506605.557749
-  },
   "AP15R_NZD_USD_2026-11-12_18:03": {
     "pair": "NZD_USD",
     "strategy": "ALL_PAIRS_15R",
