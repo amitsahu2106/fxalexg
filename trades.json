@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1795100590.377891,
+  "_ict_last_alert": 1795168984.1760225,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -165,23 +165,6 @@
     "opened_at": "2026-11-10 14:03 UTC",
     "opened_ts": 1794319425.558062
   },
-  "USD_JPY_2026-11-10_23:02": {
-    "pair": "USD_JPY",
-    "strategy": "FXALEXG",
-    "trade_key": "USD_JPY_2026-11-10_23:02",
-    "direction": "BUY",
-    "entry": 158.756,
-    "sl": 157.93514,
-    "tp1": 159.57686,
-    "tp2": 160.39772,
-    "tp3": 161.21858,
-    "tp1_hit": true,
-    "tp2_hit": false,
-    "aoi_top": 158.71,
-    "aoi_bottom": 158.143,
-    "opened_at": "2026-11-10 23:02 UTC",
-    "opened_ts": 1794351762.633075
-  },
   "_news_sent_with_events_2026-11-11": "07:02 UTC",
   "AP15R_EUR_USD_2026-11-11_14:03": {
     "pair": "EUR_USD",
@@ -339,41 +322,7 @@
     "opened_ts": 1794826969.595066
   },
   "_news_sent_with_events_2026-11-17": "07:02 UTC",
-  "AP15R_USD_JPY_2026-11-17_14:03": {
-    "pair": "USD_JPY",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_USD_JPY_2026-11-17_14:03",
-    "direction": "BUY",
-    "entry": 159.34,
-    "sl": 158.80879,
-    "tp1": 160.13682,
-    "tp2": 160.66804,
-    "tp3": 161.19925,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-11-17 14:03 UTC",
-    "opened_ts": 1794924231.796872
-  },
   "_news_sent_with_events_2026-11-18": "07:02 UTC",
-  "AP15R_USD_JPY_2026-11-18_19:03": {
-    "pair": "USD_JPY",
-    "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_USD_JPY_2026-11-18_19:03",
-    "direction": "BUY",
-    "entry": 159.332,
-    "sl": 158.86154,
-    "tp1": 160.0377,
-    "tp2": 160.50816,
-    "tp3": 160.97862,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": null,
-    "aoi_bottom": null,
-    "opened_at": "2026-11-18 19:03 UTC",
-    "opened_ts": 1795028590.646848
-  },
   "GBP_USD_2026-11-19_13:02": {
     "pair": "GBP_USD",
     "strategy": "FXALEXG",
