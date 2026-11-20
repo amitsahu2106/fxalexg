@@ -130,23 +130,6 @@
   },
   "_news_sent_with_events_2026-11-05": "07:02 UTC",
   "_news_sent_with_events_2026-11-06": "07:02 UTC",
-  "AUD_USD_2026-11-06_15:02": {
-    "pair": "AUD_USD",
-    "strategy": "FXALEXG",
-    "trade_key": "AUD_USD_2026-11-06_15:02",
-    "direction": "SELL",
-    "entry": 0.68922,
-    "sl": 0.69539,
-    "tp1": 0.68305,
-    "tp2": 0.66609,
-    "tp3": 0.665,
-    "tp1_hit": true,
-    "tp2_hit": true,
-    "aoi_top": 0.69306,
-    "aoi_bottom": 0.68869,
-    "opened_at": "2026-11-06 15:02 UTC",
-    "opened_ts": 1793977376.092852
-  },
   "_news_sent_with_events_2026-11-10": "07:02 UTC",
   "AP15R_EUR_USD_2026-11-10_14:03": {
     "pair": "EUR_USD",
