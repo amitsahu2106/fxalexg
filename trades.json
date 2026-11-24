@@ -323,5 +323,22 @@
     "opened_at": "2026-11-24 06:03 UTC",
     "opened_ts": 1795500223.432531
   },
-  "_news_sent_with_events_2026-11-24": "07:02 UTC"
+  "_news_sent_with_events_2026-11-24": "07:02 UTC",
+  "USD_CHF_2026-11-24_19:02": {
+    "pair": "USD_CHF",
+    "strategy": "FXALEXG",
+    "trade_key": "USD_CHF_2026-11-24_19:02",
+    "direction": "SELL",
+    "entry": 0.8355,
+    "sl": 0.8378,
+    "tp1": 0.8332,
+    "tp2": 0.82803,
+    "tp3": 0.82596,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.83578,
+    "aoi_bottom": 0.8334,
+    "opened_at": "2026-11-24 19:02 UTC",
+    "opened_ts": 1795546976.048049
+  }
 }
