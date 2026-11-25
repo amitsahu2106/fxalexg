@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1795601020.32218,
+  "_ict_last_alert": 1795615387.3836863,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -392,5 +392,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-11-25 13:03 UTC",
     "opened_ts": 1795611823.081614
+  },
+  "AUD_USD_2026-11-25_14:02": {
+    "pair": "AUD_USD",
+    "strategy": "FXALEXG",
+    "trade_key": "AUD_USD_2026-11-25_14:02",
+    "direction": "SELL",
+    "entry": 0.65744,
+    "sl": 0.66015,
+    "tp1": 0.65473,
+    "tp2": 0.64816,
+    "tp3": 0.64677,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": 0.6576,
+    "aoi_bottom": 0.65447,
+    "opened_at": "2026-11-25 14:02 UTC",
+    "opened_ts": 1795615376.274663
   }
 }
