@@ -376,21 +376,21 @@
     "opened_at": "2026-11-25 07:03 UTC",
     "opened_ts": 1795590187.648795
   },
-  "AP15R_USD_CAD_2026-11-25_10:03": {
+  "AP15R_USD_CAD_2026-11-25_13:03": {
     "pair": "USD_CAD",
     "strategy": "ALL_PAIRS_15R",
-    "trade_key": "AP15R_USD_CAD_2026-11-25_10:03",
+    "trade_key": "AP15R_USD_CAD_2026-11-25_13:03",
     "direction": "BUY",
-    "entry": 1.42912,
-    "sl": 1.42562,
-    "tp1": 1.43437,
-    "tp2": 1.43787,
-    "tp3": 1.44137,
+    "entry": 1.4259,
+    "sl": 1.4224,
+    "tp1": 1.43115,
+    "tp2": 1.43465,
+    "tp3": 1.43815,
     "tp1_hit": false,
     "tp2_hit": false,
     "aoi_top": null,
     "aoi_bottom": null,
-    "opened_at": "2026-11-25 10:03 UTC",
-    "opened_ts": 1795601038.286595
+    "opened_at": "2026-11-25 13:03 UTC",
+    "opened_ts": 1795611823.081614
   }
 }
