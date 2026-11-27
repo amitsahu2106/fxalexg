@@ -1,5 +1,5 @@
 {
-  "_ict_last_alert": 1795770189.922396,
+  "_ict_last_alert": 1795788197.8268394,
   "_news_sent_2026-05-29": "07:00 UTC",
   "_news_sent_2026-05-30": "07:00 UTC",
   "_news_sent_2026-05-31": "07:00 UTC",
@@ -376,23 +376,6 @@
     "opened_at": "2026-11-27 05:03 UTC",
     "opened_ts": 1795755787.717116
   },
-  "USD_CHF_2026-11-27_07:02": {
-    "pair": "USD_CHF",
-    "strategy": "FXALEXG",
-    "trade_key": "USD_CHF_2026-11-27_07:02",
-    "direction": "SELL",
-    "entry": 0.83395,
-    "sl": 0.83665,
-    "tp1": 0.83125,
-    "tp2": 0.82803,
-    "tp3": 0.82596,
-    "tp1_hit": false,
-    "tp2_hit": false,
-    "aoi_top": 0.83578,
-    "aoi_bottom": 0.8334,
-    "opened_at": "2026-11-27 07:02 UTC",
-    "opened_ts": 1795762978.238223
-  },
   "AP15R_USD_JPY_2026-11-27_11:03": {
     "pair": "USD_JPY",
     "strategy": "ALL_PAIRS_15R",
@@ -409,5 +392,22 @@
     "aoi_bottom": null,
     "opened_at": "2026-11-27 11:03 UTC",
     "opened_ts": 1795777383.622163
+  },
+  "AP15R_AUD_USD_2026-11-27_14:03": {
+    "pair": "AUD_USD",
+    "strategy": "ALL_PAIRS_15R",
+    "trade_key": "AP15R_AUD_USD_2026-11-27_14:03",
+    "direction": "SELL",
+    "entry": 0.66604,
+    "sl": 0.66917,
+    "tp1": 0.66135,
+    "tp2": 0.65822,
+    "tp3": 0.65509,
+    "tp1_hit": false,
+    "tp2_hit": false,
+    "aoi_top": null,
+    "aoi_bottom": null,
+    "opened_at": "2026-11-27 14:03 UTC",
+    "opened_ts": 1795788206.177044
   }
 }
